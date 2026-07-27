@@ -5486,7 +5486,10 @@ async function publicarDadosGitHub(){
     let sha;
     const getResp=await fetch(apiUrl+'?ref='+GITHUB_BRANCH,{headers});
     if(getResp.ok){ sha=(await getResp.json()).sha; }
-    else if(getResp.status!==404){ throw new Error('Falha ao consultar arquivo atual (HTTP '+getResp.status+')'); }
+    else if(getResp.status!==404){
+      const getErrTxt=await getResp.text().catch(()=>'');
+      throw new Error('Falha ao consultar arquivo atual (HTTP '+getResp.status+') — '+getErrTxt.slice(0,200));
+    }
 
     const body={message:'Atualização de dados via dashboard — '+new Date().toLocaleString('pt-BR'),
       content:utf8ParaBase64(jsonStr), branch:GITHUB_BRANCH};
@@ -5500,7 +5503,7 @@ async function publicarDadosGitHub(){
   }catch(e){
     console.warn('publicar direto no GitHub falhou:',e);
     baixarSnapshotLocal(jsonStr);
-    alert('⚠️ Não consegui publicar direto no GitHub (motivo: '+e.message+').\n\nBaixei o "dados_base.json" como alternativa — suba manualmente pelo GitHub (Add file → Upload files).');
+    alert('⚠️ Não consegui publicar direto no GitHub (motivo: '+e.message+').\n\nBaixei o "dados_base.json" como alternativa — suba manualmente pelo GitHub (Add file → Upload files).\n\n(Token ativo termina em: ...'+GITHUB_TOKEN.slice(-6)+')');
   }
 }
 // Aplica um snapshot vindo do "dados_base.json" publicado no GitHub — sobrescreve
