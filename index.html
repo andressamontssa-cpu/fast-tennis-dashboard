@@ -211,6 +211,7 @@ try{
     <button class="upload-btn" id="upload-btn-fat" onclick="abrirModal('fat')" title="Planilha mensal oficial: Fat. Meta, Tendência, Real D-1, Inad., Ticket, Meta de Vendas, Gerente">💰 Metas do Mês</button>
     <input type="file" id="upload-fat-input" accept=".csv,.xlsx,.xls" style="display:none" onchange="processarArquivoFat(this)">
     <button class="upload-btn" id="upload-btn-novaunidade" onclick="abrirModal('novaunidade')" title="Cadastrar uma unidade nova (recém-inaugurada) para que ela já apareça no dashboard e seja reconhecida nos próximos uploads">➕ Nova Unidade</button>
+    <button onclick="publicarDadosGitHub()" title="Depois de subir todas as bases do mês (Metas, Base de Clientes, Custo Fixo, Leads/Conversão), clique aqui para publicar os dados atualizados direto no GitHub. Em 1-2 minutos, todo mundo que abrir o link vê os dados novos — automaticamente, sem precisar subir arquivo nenhum manualmente." style="background:#053CD8;border:1px solid #053CD8;color:#fff;border-radius:6px;padding:6px 10px;font-size:11px;font-weight:700;cursor:pointer;margin-right:6px;flex-shrink:0">🚀 Atualizar para Todos</button>
     <button onclick="window.print()" title="Exportar aba atual para PDF (usa a impressão do navegador — escolha 'Salvar como PDF')" style="background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);color:#fff;border-radius:6px;padding:6px 10px;font-size:11px;font-weight:700;cursor:pointer;margin-right:6px;flex-shrink:0">🖨️ Exportar PDF</button>
     <button onclick="limparCacheLocal()" title="Se algum número parecer travado/desatualizado mesmo após atualizar o arquivo, use este botão para limpar dados salvos no navegador (uploads antigos de Metas do Mês, Base de Clientes, Custo Fixo) e recarregar do zero" style="background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);color:#fff;border-radius:6px;padding:6px 10px;font-size:11px;font-weight:700;cursor:pointer;margin-right:6px;flex-shrink:0">🧹 Limpar Cache Local</button>
     <button onclick="bloquearDashboard()" title="Bloquear a visualização do dashboard neste navegador (pede a senha de acesso novamente na próxima vez que abrir) — use em computadores compartilhados" style="background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);color:#fff;border-radius:6px;padding:6px 10px;font-size:11px;font-weight:700;cursor:pointer;margin-right:10px;flex-shrink:0">🔒 Bloquear</button>
@@ -5431,6 +5432,87 @@ function baixarJsonNovaUnidade(chave,info,alias){
   }catch(e){console.warn('baixar json nova unidade:',e);}
 }
 
+// ── EXPORTAR/IMPORTAR SNAPSHOT COMPLETO DOS DADOS (via GitHub) ──────────────
+// Todos os campos de D que são preenchidos pelos uploads (Metas do Mês, Base de
+// Clientes, Custo Fixo, Leads/Conversão, Nova Unidade). NÃO inclui preferências
+// de tela (filtros, comparativos) — só dado.
+const CAMPOS_SNAPSHOT_DADOS=['fat_data','fat_meta','fat_ref','metas_mensais','unidades_info',
+  'vendas_monthly','vendas_daily','ativos_rec','ativos_rec_hist','ativos_plano','plano_mes',
+  'vmeta','plano_nomes','fat_novas_daily','fat_total_daily','receita_avulsa_loc_mensal',
+  'tk_auto','churn_mensal','conversao_mensal','ocupacao_mensal','ocupacao_real','cluster_op',
+  'tend_churn_mensal','custo_fixo'];
+// Config do repositório onde este dashboard está publicado (GitHub Pages).
+// GITHUB_TOKEN: token de acesso pessoal do GitHub, com permissão SÓ de
+// "Contents: Read and write" e SÓ neste repositório (gerado em
+// github.com/settings/tokens?type=beta). Fica embutido neste arquivo público —
+// decisão já validada: qualquer pessoa com o link técnico consegue extrair esse
+// token, mas o alcance dele é limitado a escrever arquivos só neste repositório.
+const GITHUB_OWNER='andressamontssa-cpu';
+const GITHUB_REPO='fast-tennis-dashboard';
+const GITHUB_BRANCH='main';
+const GITHUB_TOKEN='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';
+
+function utf8ParaBase64(str){
+  return btoa(unescape(encodeURIComponent(str)));
+}
+function baixarSnapshotLocal(jsonStr){
+  try{
+    const blob=new Blob([jsonStr],{type:'application/json'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url; a.download='dados_base.json';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(()=>URL.revokeObjectURL(url),2000);
+  }catch(e){console.warn('baixar snapshot local:',e);}
+}
+async function publicarDadosGitHub(){
+  const pin=prompt('Senha de upload:');
+  if(pin!=='9083'){ if(pin!==null)alert('❌ Senha incorreta.'); return; }
+
+  const snap={_snapshot_geradoEm:new Date().toISOString()};
+  CAMPOS_SNAPSHOT_DADOS.forEach(k=>{ snap[k]=(D[k]!==undefined)?D[k]:null; });
+  const jsonStr=JSON.stringify(snap);
+
+  if(!GITHUB_TOKEN||GITHUB_TOKEN.indexOf('PLACEHOLDER')>=0){
+    baixarSnapshotLocal(jsonStr);
+    alert('⚠️ Publicação automática ainda não configurada neste arquivo.\n\nBaixei o "dados_base.json" — suba manualmente no GitHub (Add file → Upload files) por enquanto.');
+    return;
+  }
+
+  const path='dados_base.json';
+  const apiUrl='https://api.github.com/repos/'+GITHUB_OWNER+'/'+GITHUB_REPO+'/contents/'+path;
+  const headers={'Authorization':'Bearer '+GITHUB_TOKEN,'Accept':'application/vnd.github+json'};
+  try{
+    let sha;
+    const getResp=await fetch(apiUrl+'?ref='+GITHUB_BRANCH,{headers});
+    if(getResp.ok){ sha=(await getResp.json()).sha; }
+    else if(getResp.status!==404){ throw new Error('Falha ao consultar arquivo atual (HTTP '+getResp.status+')'); }
+
+    const body={message:'Atualização de dados via dashboard — '+new Date().toLocaleString('pt-BR'),
+      content:utf8ParaBase64(jsonStr), branch:GITHUB_BRANCH};
+    if(sha)body.sha=sha;
+    const putResp=await fetch(apiUrl,{method:'PUT',headers:Object.assign({'Content-Type':'application/json'},headers),body:JSON.stringify(body)});
+    if(!putResp.ok){
+      const errTxt=await putResp.text().catch(()=>'');
+      throw new Error('HTTP '+putResp.status+' '+errTxt.slice(0,200));
+    }
+    alert('✅ Publicado direto no GitHub!\n\nEm 1-2 minutos, todo mundo que abrir o link já vê os dados atualizados — não precisa fazer mais nada.');
+  }catch(e){
+    console.warn('publicar direto no GitHub falhou:',e);
+    baixarSnapshotLocal(jsonStr);
+    alert('⚠️ Não consegui publicar direto no GitHub (motivo: '+e.message+').\n\nBaixei o "dados_base.json" como alternativa — suba manualmente pelo GitHub (Add file → Upload files).');
+  }
+}
+// Aplica um snapshot vindo do "dados_base.json" publicado no GitHub — sobrescreve
+// os campos de dados com o que estiver no arquivo (o arquivo publicado é sempre
+// a versão mais atual e vale para todo mundo que abre o link).
+function aplicarSnapshotRemoto(snap){
+  try{
+    if(!snap||typeof snap!=='object')return;
+    CAMPOS_SNAPSHOT_DADOS.forEach(k=>{ if(snap[k]!==undefined&&snap[k]!==null) D[k]=snap[k]; });
+  }catch(e){console.warn('aplicar snapshot remoto:',e);}
+}
+
 // ══ UPLOAD 2: PLANILHA MENSAL OFICIAL (Fat. Meta, Real D-1, Inad., Ticket...) ══
 function normMid(s){
   return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/\s+/g,' ').trim();
@@ -5917,8 +5999,12 @@ async function processarArquivoVendas(input){
         alert(r.ok?('✅ Conversão: '+r.nMeses+' meses · '+r.nUnidades+' unidades'):('❌ '+r.error));
         const hdrEl2=document.getElementById('hdr-date');
         if(hdrEl2){
+          // Substitui o "⏳ Carregando..." em vez de só acrescentar embaixo dele —
+          // sem isso, a mensagem de carregamento ficava presa na tela para sempre.
+          const hoje2=new Date();
+          const dataFmt2=String(hoje2.getDate()).padStart(2,'0')+'/'+String(hoje2.getMonth()+1).padStart(2,'0')+'/'+hoje2.getFullYear();
           const msg=r.ok?'✅ conversão/leads calculados ('+r.nUnidades+' unidades)':'⚠️ conversão/leads não calculados — '+r.error;
-          hdrEl2.innerHTML+='<br><small style="color:'+(r.ok?'var(--green-lt)':'#FFB74D')+';font-size:9px">'+msg+'</small>';
+          hdrEl2.innerHTML='Dados: '+dataFmt2+'<br><small style="color:'+(r.ok?'var(--green-lt)':'#FFB74D')+';font-size:9px">'+msg+'</small>';
         }
         try{renderActive();}catch(e){}
       } else {
@@ -7179,11 +7265,17 @@ function iniciarDashboard(){
   initDia();
   renderActive();
 }
-fetch('./dados_atualizacao.json',{cache:'no-store'}).then(r=>r&&r.ok?r.json():null).catch(()=>null)
-  .then(remotoJson=>{
+Promise.all([
+  fetch('./dados_atualizacao.json',{cache:'no-store'}).then(r=>r&&r.ok?r.json():null).catch(()=>null),
+  fetch('./dados_base.json',{cache:'no-store'}).then(r=>r&&r.ok?r.json():null).catch(()=>null)
+])
+  .then(([remotoJson,snapshotJson])=>{
     if(remotoJson&&remotoJson.novas_unidades)aplicarNovasUnidadesRemotas(remotoJson.novas_unidades);
+    // dados_base.json (gerado pelo botão "📤 Exportar p/ GitHub") tem prioridade — é sempre
+    // a versão mais atual publicada, deve valer para todo mundo que abrir o link.
+    if(snapshotJson)aplicarSnapshotRemoto(snapshotJson);
   })
-  .catch(()=>{ /* dados_atualizacao.json não disponível — segue só com dados locais */ })
+  .catch(()=>{ /* nenhum arquivo de dados remoto disponível — segue só com dados locais */ })
   .finally(iniciarDashboard);
 </script>
 </body></html>
