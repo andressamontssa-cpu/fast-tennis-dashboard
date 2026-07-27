@@ -5442,15 +5442,20 @@ const CAMPOS_SNAPSHOT_DADOS=['fat_data','fat_meta','fat_ref','metas_mensais','un
   'tk_auto','churn_mensal','conversao_mensal','ocupacao_mensal','ocupacao_real','cluster_op',
   'tend_churn_mensal','custo_fixo'];
 // Config do repositório onde este dashboard está publicado (GitHub Pages).
-// GITHUB_TOKEN: token de acesso pessoal do GitHub, com permissão SÓ de
-// "Contents: Read and write" e SÓ neste repositório (gerado em
-// github.com/settings/tokens?type=beta). Fica embutido neste arquivo público —
+// GITHUB_TOKEN: token de acesso pessoal do GitHub (clássico, escopo "repo"),
+// gerado em github.com/settings/tokens/new. Fica embutido neste arquivo público —
 // decisão já validada: qualquer pessoa com o link técnico consegue extrair esse
-// token, mas o alcance dele é limitado a escrever arquivos só neste repositório.
+// token. Importante: diferente do formato "fine-grained" (que dá para limitar a
+// um único repositório), o token clássico dá acesso de leitura/escrita a TODOS
+// os repositórios desta conta GitHub, não só este. Usamos esse formato porque
+// contas recém-criadas no GitHub têm uma restrição temporária que impede tokens
+// fine-grained de autenticar; assim que a conta "amadurecer" (alguns dias/semanas),
+// dá para gerar um token fine-grained (escopo restrito só a este repositório) e
+// trocar aqui, se quiser reduzir o alcance.
 const GITHUB_OWNER='andressamontssa-cpu';
 const GITHUB_REPO='fast-tennis-dashboard';
 const GITHUB_BRANCH='main';
-const GITHUB_TOKEN='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';
+const GITHUB_TOKEN='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';
 
 function utf8ParaBase64(str){
   return btoa(unescape(encodeURIComponent(str)));
