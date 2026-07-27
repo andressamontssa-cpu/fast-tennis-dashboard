@@ -24,30 +24,37 @@ descobrir se o problema é o token em si ou alguma interferência do arquivo gra
 <label for="tok">Cole aqui o token (github_pat_...):</label>
 <textarea id="tok" placeholder="github_pat_..."></textarea>
 <br>
-<button id="btn" onclick="testar()">Testar token</button>
+<button id="btn" onclick="testar()">Testar token (arquivo do repositório)</button>
+<button id="btn2" onclick="testarUser()" style="background:#444">Testar token (identidade /user)</button>
 
 <pre id="out">(resultado vai aparecer aqui)</pre>
 
 <script>
-async function testar(){
-  const btn=document.getElementById('btn');
-  const out=document.getElementById('out');
+function coletarToken(){
   const tokRaw=document.getElementById('tok').value;
   const tok=tokRaw.trim();
-  btn.disabled=true;
-  out.className='';
-  out.textContent='Testando...';
-
+  return {tok,tokRaw};
+}
+function infoBase(tok,tokRaw){
   const info=['Tamanho do token colado: '+tok.length+' caracteres',
               'Começa com: '+tok.slice(0,14),
               'Termina com: '+tok.slice(-8),
               ''];
-
   if(tok!==tokRaw){
     info.push('⚠️ Havia espaço(s) em branco antes/depois do token — foram removidos automaticamente para o teste.');
     info.push('');
   }
-
+  return info;
+}
+async function testar(){
+  const btn=document.getElementById('btn');
+  const out=document.getElementById('out');
+  const {tok,tokRaw}=coletarToken();
+  btn.disabled=true;
+  out.className='';
+  out.textContent='Testando...';
+  const info=infoBase(tok,tokRaw);
+  info.push('Teste: consultar dados_base.json no repositório');
   try{
     const url='https://api.github.com/repos/andressamontssa-cpu/fast-tennis-dashboard/contents/dados_base.json?ref=main';
     const resp=await fetch(url,{headers:{'Authorization':'Bearer '+tok,'Accept':'application/vnd.github+json'}});
@@ -56,6 +63,30 @@ async function testar(){
     info.push('Resposta do GitHub:');
     info.push(bodyTxt);
     out.className=resp.ok||resp.status===404?'ok':'fail';
+  }catch(e){
+    info.push('Erro de rede/JS ao tentar: '+(e&&e.message?e.message:e));
+    out.className='fail';
+  }
+  out.textContent=info.join('\n');
+  btn.disabled=false;
+}
+async function testarUser(){
+  const btn=document.getElementById('btn2');
+  const out=document.getElementById('out');
+  const {tok,tokRaw}=coletarToken();
+  btn.disabled=true;
+  out.className='';
+  out.textContent='Testando...';
+  const info=infoBase(tok,tokRaw);
+  info.push('Teste: GET /user (identidade básica da conta, não depende de repositório nenhum)');
+  try{
+    const url='https://api.github.com/user';
+    const resp=await fetch(url,{headers:{'Authorization':'Bearer '+tok,'Accept':'application/vnd.github+json'}});
+    const bodyTxt=await resp.text();
+    info.push('HTTP status: '+resp.status);
+    info.push('Resposta do GitHub:');
+    info.push(bodyTxt);
+    out.className=resp.ok?'ok':'fail';
   }catch(e){
     info.push('Erro de rede/JS ao tentar: '+(e&&e.message?e.message:e));
     out.className='fail';
