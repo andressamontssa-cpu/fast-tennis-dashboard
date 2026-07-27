@@ -5917,8 +5917,12 @@ async function processarArquivoVendas(input){
         alert(r.ok?('✅ Conversão: '+r.nMeses+' meses · '+r.nUnidades+' unidades'):('❌ '+r.error));
         const hdrEl2=document.getElementById('hdr-date');
         if(hdrEl2){
+          // Substitui o "⏳ Carregando..." em vez de só acrescentar embaixo dele —
+          // sem isso, a mensagem de carregamento ficava presa na tela para sempre.
+          const hoje2=new Date();
+          const dataFmt2=String(hoje2.getDate()).padStart(2,'0')+'/'+String(hoje2.getMonth()+1).padStart(2,'0')+'/'+hoje2.getFullYear();
           const msg=r.ok?'✅ conversão/leads calculados ('+r.nUnidades+' unidades)':'⚠️ conversão/leads não calculados — '+r.error;
-          hdrEl2.innerHTML+='<br><small style="color:'+(r.ok?'var(--green-lt)':'#FFB74D')+';font-size:9px">'+msg+'</small>';
+          hdrEl2.innerHTML='Dados: '+dataFmt2+'<br><small style="color:'+(r.ok?'var(--green-lt)':'#FFB74D')+';font-size:9px">'+msg+'</small>';
         }
         try{renderActive();}catch(e){}
       } else {
