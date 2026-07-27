@@ -211,6 +211,7 @@ try{
     <button class="upload-btn" id="upload-btn-fat" onclick="abrirModal('fat')" title="Planilha mensal oficial: Fat. Meta, Tendência, Real D-1, Inad., Ticket, Meta de Vendas, Gerente">💰 Metas do Mês</button>
     <input type="file" id="upload-fat-input" accept=".csv,.xlsx,.xls" style="display:none" onchange="processarArquivoFat(this)">
     <button class="upload-btn" id="upload-btn-novaunidade" onclick="abrirModal('novaunidade')" title="Cadastrar uma unidade nova (recém-inaugurada) para que ela já apareça no dashboard e seja reconhecida nos próximos uploads">➕ Nova Unidade</button>
+    <button class="upload-btn" id="upload-btn-editarvendas" onclick="abrirModal('editarvendas')" title="Corrigir manualmente o número de Vendas de uma unidade num mês específico — para dados que vêm de um sistema à parte e não passam pelos uploads normais">✏️ Editar Vendas</button>
     <button onclick="publicarDadosGitHub()" title="Depois de subir todas as bases do mês (Metas, Base de Clientes, Custo Fixo, Leads/Conversão), clique aqui para publicar os dados atualizados direto no GitHub. Em 1-2 minutos, todo mundo que abrir o link vê os dados novos — automaticamente, sem precisar subir arquivo nenhum manualmente." style="background:#053CD8;border:1px solid #053CD8;color:#fff;border-radius:6px;padding:6px 10px;font-size:11px;font-weight:700;cursor:pointer;margin-right:6px;flex-shrink:0">🚀 Atualizar para Todos</button>
     <button onclick="window.print()" title="Exportar aba atual para PDF (usa a impressão do navegador — escolha 'Salvar como PDF')" style="background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);color:#fff;border-radius:6px;padding:6px 10px;font-size:11px;font-weight:700;cursor:pointer;margin-right:6px;flex-shrink:0">🖨️ Exportar PDF</button>
     <button onclick="limparCacheLocal()" title="Se algum número parecer travado/desatualizado mesmo após atualizar o arquivo, use este botão para limpar dados salvos no navegador (uploads antigos de Metas do Mês, Base de Clientes, Custo Fixo) e recarregar do zero" style="background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);color:#fff;border-radius:6px;padding:6px 10px;font-size:11px;font-weight:700;cursor:pointer;margin-right:6px;flex-shrink:0">🧹 Limpar Cache Local</button>
@@ -893,6 +894,33 @@ try{
     <div id="nu-err" style="color:#E53935;font-size:12px;margin-bottom:8px"></div>
     <button id="nu-salvar" onclick="salvarNovaUnidade()" style="width:100%;padding:12px;background:#053CD8;color:#fff;border:none;border-radius:8px;font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:800;cursor:pointer">✅ Cadastrar Unidade</button>
     <p style="font-size:10px;color:var(--gray);margin-top:8px;text-align:center">⚠️ Este cadastro só aparece agora, aqui, neste navegador. Para ele valer em TODOS os computadores, baixe o arquivo JSON gerado automaticamente e me envie (ou suba pelo GitHub) — eu incluo a unidade na próxima versão do dashboard.</p>
+  </div>
+</div>
+
+<!-- MODAL: EDITAR VENDAS (correção manual, unidade + mês) -->
+<div id="ev-overlay" onclick="if(event.target===this)fecharModalEV()" style="display:none;position:fixed;inset:0;background:rgba(2,45,138,.45);z-index:9999;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:12px;max-width:440px;width:92%;max-height:88vh;overflow-y:auto;padding:22px 24px;position:relative;box-shadow:0 20px 50px rgba(0,0,0,.3)">
+    <button onclick="fecharModalEV()" style="position:absolute;top:12px;right:14px;background:none;border:none;font-size:20px;cursor:pointer;color:#8A96B0;line-height:1;padding:0">✕</button>
+    <h3 style="margin:0 0 4px;font-family:'Barlow Condensed',sans-serif;font-size:22px;color:var(--navy)">✏️ Editar Vendas</h3>
+    <p style="font-size:12px;color:var(--gray);margin:0 0 16px">Use isso para corrigir o número de Vendas (matrículas) de uma unidade num mês específico — útil para dados de um sistema à parte, que você acompanha e digita manualmente, sem precisar subir planilha nem pedir versão nova do dashboard.</p>
+
+    <label class="finp-lbl">Unidade</label>
+    <select id="ev-unidade" class="finp" style="width:100%;margin-bottom:10px" onchange="evAtualizarAtual()"></select>
+
+    <label class="finp-lbl">Mês</label>
+    <select id="ev-mes" class="finp" style="width:100%;margin-bottom:10px" onchange="evAtualizarAtual()"></select>
+
+    <div style="background:#F0F4FF;border:1px solid #D6E0FF;border-radius:8px;padding:10px 12px;margin-bottom:14px">
+      <div style="font-size:10px;font-weight:800;color:var(--navy);text-transform:uppercase">Valor atual no dashboard</div>
+      <div id="ev-atual" style="font-size:13px;font-weight:700;color:var(--navy);margin-top:2px">—</div>
+    </div>
+
+    <label class="finp-lbl">Vendas corrigidas (matrículas no mês)</label>
+    <input id="ev-valor" type="number" min="0" class="finp" style="width:100%;margin-bottom:6px" placeholder="Ex.: 26">
+
+    <div id="ev-err" style="color:#E53935;font-size:12px;margin-bottom:8px"></div>
+    <button id="ev-salvar" onclick="salvarEdicaoVendas()" style="width:100%;padding:12px;background:#053CD8;color:#fff;border:none;border-radius:8px;font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:800;cursor:pointer">💾 Salvar correção</button>
+    <p style="font-size:10px;color:var(--gray);margin-top:8px;text-align:center">⚠️ Essa correção já aparece agora, aqui, neste navegador (afeta Raio X, Ranking, Conversão etc.). Para ela valer em TODOS os computadores, clique em "🚀 Atualizar para Todos" (ou baixe o dados_base.json e suba pelo GitHub) depois de salvar.</p>
   </div>
 </div>
 
@@ -5250,7 +5278,7 @@ let UPLOAD_TARGET='vendas';
 function abrirModal(target){
   UPLOAD_TARGET=target||'vendas';
   const go=document.getElementById('upload-go');
-  if(go)go.textContent=UPLOAD_TARGET==='fat'?'💰 Carregar Metas do Mês':(UPLOAD_TARGET==='novaunidade'?'➕ Continuar':'📂 Carregar Base');
+  if(go)go.textContent=UPLOAD_TARGET==='fat'?'💰 Carregar Metas do Mês':(UPLOAD_TARGET==='novaunidade'?'➕ Continuar':(UPLOAD_TARGET==='editarvendas'?'✏️ Continuar':'📂 Carregar Base'));
   const overlay=document.getElementById('upload-overlay');
   const pwd=document.getElementById('upload-pwd');
   const err=document.getElementById('upload-pwd-err');
@@ -5293,6 +5321,11 @@ function triggerUpload(){
   if(UPLOAD_TARGET==='novaunidade'){
     fecharModal();
     abrirModalNU();
+    return;
+  }
+  if(UPLOAD_TARGET==='editarvendas'){
+    fecharModal();
+    abrirModalEV();
     return;
   }
   const id=UPLOAD_TARGET==='fat'?'upload-fat-input':'upload-vendas-input';
@@ -5418,6 +5451,84 @@ function salvarNovaUnidade(){
   try{renderActive();}catch(e){}
   baixarJsonNovaUnidade(chave,info,alias);
   alert('✅ Unidade cadastrada: '+chave+'\n\nJá aparece nos filtros AQUI NESTE COMPUTADOR/NAVEGADOR e vai entrar automaticamente nos relatórios do mês assim que você lançar Meta ou Venda para ela.\n\n📊 Para ela aparecer em TODOS os computadores, baixei um arquivo JSON com os dados dessa unidade — me envie esse arquivo (ou suba no GitHub) para eu incluir na próxima versão publicada do dashboard.'+(alias?'':'\n\n⚠️ Você não informou o nome usado na planilha de Vendas/Clientes — se a primeira base de vendas dessa unidade não for reconhecida automaticamente, me avise o nome exato para eu completar o mapeamento.'));
+}
+// ══ EDITAR VENDAS (correção manual pontual, unidade + mês) ══
+// Serve para números que vêm de um sistema à parte (não passam pelos uploads
+// normais de Base de Clientes) e que a Andressa precisa digitar/corrigir na mão,
+// sem precisar montar planilha nem pedir versão nova do dashboard. Grava direto
+// em D.vendas_monthly (o mesmo campo usado pelos uploads normais), então tudo que
+// já lê esse campo (Raio X, Ranking, Conversão, Comparativo) reflete a correção
+// automaticamente, e ela entra no snapshot do botão "🚀 Atualizar para Todos".
+function evListaMeses(){
+  const s=new Set(Object.keys(D.fat_data||{}));
+  // também inclui meses que só existem em vendas_monthly (de alguma unidade), pra não perder mês fora do fat_data
+  Object.values(D.vendas_monthly||{}).forEach(porMes=>Object.keys(porMes||{}).forEach(m=>s.add(m)));
+  return [...s].sort();
+}
+function abrirModalEV(){
+  const selU=document.getElementById('ev-unidade');
+  const units=Object.keys(D.unidades_info||{}).sort((a,b)=>dispName(a).localeCompare(dispName(b)));
+  selU.innerHTML=units.map(u=>`<option value="${u}">${dispName(u)}</option>`).join('');
+
+  const selM=document.getElementById('ev-mes');
+  const meses=evListaMeses();
+  selM.innerHTML=meses.map(m=>`<option value="${m}">${nomeMesCg(m)}</option>`).join('');
+  if(meses.length)selM.value=meses[meses.length-1];
+
+  document.getElementById('ev-valor').value='';
+  document.getElementById('ev-err').textContent='';
+  evAtualizarAtual();
+  document.getElementById('ev-overlay').style.display='flex';
+}
+function fecharModalEV(){
+  document.getElementById('ev-overlay').style.display='none';
+}
+function evAtualizarAtual(){
+  const u=document.getElementById('ev-unidade').value;
+  const m=document.getElementById('ev-mes').value;
+  const atualEl=document.getElementById('ev-atual');
+  const v=(D.vendas_monthly&&D.vendas_monthly[u]&&D.vendas_monthly[u][m]!=null)?D.vendas_monthly[u][m]:null;
+  atualEl.textContent=(v!=null)?(v+' vendas em '+nomeMesCg(m)):'(sem valor registrado neste mês)';
+}
+function salvarEdicaoVendas(){
+  const err=document.getElementById('ev-err');
+  err.textContent='';
+  const u=document.getElementById('ev-unidade').value;
+  const m=document.getElementById('ev-mes').value;
+  const valor=parseInt(document.getElementById('ev-valor').value);
+  if(!u||!m){ err.textContent='❌ Selecione unidade e mês.'; return; }
+  if(isNaN(valor)||valor<0){ err.textContent='❌ Informe um número de vendas válido (0 ou maior).'; return; }
+
+  if(!D.vendas_monthly)D.vendas_monthly={};
+  if(!D.vendas_monthly[u])D.vendas_monthly[u]={};
+  D.vendas_monthly[u][m]=valor;
+
+  // Persiste no localStorage deste navegador, junto com o resto dos dados de vendas
+  // (mesmo formato salvo pelos uploads normais, pra não perder no reload da página).
+  try{
+    const save={
+      vendas_monthly: D.vendas_monthly,
+      vendas_daily:   D.vendas_daily||{},
+      ativos_rec:     D.ativos_rec||{},
+      ativos_rec_hist: D.ativos_rec_hist||{},
+      ativos_plano:   D.ativos_plano||{},
+      plano_mes:      D.plano_mes||{},
+      vmeta:          D.vmeta||{},
+      plano_nomes:    D.plano_nomes||{},
+      fat_novas_daily:D.fat_novas_daily||{},
+      fat_total_daily:D.fat_total_daily||{},
+      receita_avulsa_loc_mensal: D.receita_avulsa_loc_mensal||{},
+      tk_auto:D.tk_auto||{},
+      churn_mensal:   D.churn_mensal||{},
+      conversao_mensal: D.conversao_mensal||{},
+      savedAt:        new Date().toISOString()
+    };
+    localStorage.setItem('ft_vendas_data', JSON.stringify(save));
+  }catch(e){console.warn('salvar edição de vendas:',e);}
+
+  fecharModalEV();
+  try{renderActive();}catch(e){}
+  alert('✅ Vendas de '+dispName(u)+' em '+nomeMesCg(m)+' corrigidas para '+valor+'.\n\nJá vale AQUI NESTE COMPUTADOR/NAVEGADOR. Para valer em TODOS, clique em "🚀 Atualizar para Todos" (ou baixe o dados_base.json e suba pelo GitHub).');
 }
 function baixarJsonNovaUnidade(chave,info,alias){
   try{
