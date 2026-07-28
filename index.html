@@ -515,6 +515,7 @@ try{
     <button id="rtab-mensal"  class="rtab active"  onclick="switchRTab('mensal')" >📆 Campanha Mensal</button>
     <button id="rtab-periodo" class="rtab"          onclick="switchRTab('periodo')">📅 Campanha por Período</button>
     <button id="rtab-comparativo" class="rtab"      onclick="switchRTab('comparativo')">📈 Comparativo de Períodos</button>
+    <button style="margin-left:auto;align-self:center;background:#053CD8;border:none;color:#fff;border-radius:6px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer" onclick="abrirModal('participacao')" title="Definir a partir de quando cada unidade participa da Campanha Mensal e/ou da Campanha por Período — útil para unidades novas, que abriram no meio do mês e podem entrar numa campanha sem entrar na outra">⚙️ Participação das Unidades</button>
   </div>
 
   <!-- ── CAMPANHA MENSAL ── -->
@@ -921,6 +922,40 @@ try{
     <div id="ev-err" style="color:#E53935;font-size:12px;margin-bottom:8px"></div>
     <button id="ev-salvar" onclick="salvarEdicaoVendas()" style="width:100%;padding:12px;background:#053CD8;color:#fff;border:none;border-radius:8px;font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:800;cursor:pointer">💾 Salvar correção</button>
     <p style="font-size:10px;color:var(--gray);margin-top:8px;text-align:center">⚠️ Essa correção já aparece agora, aqui, neste navegador (afeta Raio X, Ranking, Conversão etc.). Para ela valer em TODOS os computadores, clique em "🚀 Atualizar para Todos" (ou baixe o dados_base.json e suba pelo GitHub) depois de salvar.</p>
+  </div>
+</div>
+
+<!-- MODAL: PARTICIPAÇÃO DAS UNIDADES NAS CAMPANHAS -->
+<div id="pu-overlay" onclick="if(event.target===this)fecharModalPU()" style="display:none;position:fixed;inset:0;background:rgba(2,45,138,.45);z-index:9999;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:12px;max-width:480px;width:92%;max-height:88vh;overflow-y:auto;padding:22px 24px;position:relative;box-shadow:0 20px 50px rgba(0,0,0,.3)">
+    <button onclick="fecharModalPU()" style="position:absolute;top:12px;right:14px;background:none;border:none;font-size:20px;cursor:pointer;color:#8A96B0;line-height:1;padding:0">✕</button>
+    <h3 style="margin:0 0 4px;font-family:'Barlow Condensed',sans-serif;font-size:22px;color:var(--navy)">⚙️ Participação das Unidades nas Campanhas</h3>
+    <p style="font-size:12px;color:var(--gray);margin:0 0 16px">Use isso para controlar, unidade por unidade, a partir de quando ela entra na Campanha Mensal e/ou na Campanha por Período — são independentes: dá para uma unidade participar de uma e não da outra. Útil para unidades que abriram no meio do mês.</p>
+
+    <label class="finp-lbl">Unidade</label>
+    <select id="pu-unidade" class="finp" style="width:100%;margin-bottom:14px" onchange="puAtualizarAtual()"></select>
+
+    <div style="background:#F0F4FF;border:1px solid #D6E0FF;border-radius:8px;padding:12px;margin-bottom:14px">
+      <label class="finp-lbl">📆 Participa da Campanha Mensal a partir de</label>
+      <div style="display:flex;gap:8px;align-items:center">
+        <input id="pu-mensal" type="date" class="finp" style="flex:1">
+        <button onclick="document.getElementById('pu-mensal').value=''" style="background:#eee;border:1px solid #ccc;border-radius:6px;padding:8px 10px;font-size:11px;cursor:pointer" title="Remover restrição — a unidade passa a participar de todos os meses">🚫 Sem restrição</button>
+      </div>
+      <p style="font-size:10px;color:var(--gray);margin:6px 0 0">Vazio = participa de todos os meses, desde sempre. Preenchido = só entra no ranking mensal a partir do mês desta data (meses anteriores ficam de fora).</p>
+    </div>
+
+    <div style="background:#F0F4FF;border:1px solid #D6E0FF;border-radius:8px;padding:12px;margin-bottom:14px">
+      <label class="finp-lbl">📅 Participa da Campanha por Período a partir de</label>
+      <div style="display:flex;gap:8px;align-items:center">
+        <input id="pu-periodo" type="date" class="finp" style="flex:1">
+        <button onclick="document.getElementById('pu-periodo').value=''" style="background:#eee;border:1px solid #ccc;border-radius:6px;padding:8px 10px;font-size:11px;cursor:pointer" title="Remover restrição — a unidade passa a participar de todos os períodos">🚫 Sem restrição</button>
+      </div>
+      <p style="font-size:10px;color:var(--gray);margin:6px 0 0">Vazio = participa de qualquer período, desde sempre. Preenchido = só entra em campanhas cujo período de início seja igual ou posterior a essa data.</p>
+    </div>
+
+    <div id="pu-err" style="color:#E53935;font-size:12px;margin-bottom:8px"></div>
+    <button id="pu-salvar" onclick="salvarParticipacaoUnidade()" style="width:100%;padding:12px;background:#053CD8;color:#fff;border:none;border-radius:8px;font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:800;cursor:pointer">💾 Salvar</button>
+    <p style="font-size:10px;color:var(--gray);margin-top:8px;text-align:center">⚠️ Essa configuração já aparece agora, aqui, neste navegador. Para ela valer em TODOS os computadores, clique em "🚀 Atualizar para Todos" (ou baixe o dados_base.json e suba pelo GitHub) depois de salvar.</p>
   </div>
 </div>
 
@@ -5278,7 +5313,7 @@ let UPLOAD_TARGET='vendas';
 function abrirModal(target){
   UPLOAD_TARGET=target||'vendas';
   const go=document.getElementById('upload-go');
-  if(go)go.textContent=UPLOAD_TARGET==='fat'?'💰 Carregar Metas do Mês':(UPLOAD_TARGET==='novaunidade'?'➕ Continuar':(UPLOAD_TARGET==='editarvendas'?'✏️ Continuar':'📂 Carregar Base'));
+  if(go)go.textContent=UPLOAD_TARGET==='fat'?'💰 Carregar Metas do Mês':(UPLOAD_TARGET==='novaunidade'?'➕ Continuar':(UPLOAD_TARGET==='editarvendas'?'✏️ Continuar':(UPLOAD_TARGET==='participacao'?'⚙️ Continuar':'📂 Carregar Base')));
   const overlay=document.getElementById('upload-overlay');
   const pwd=document.getElementById('upload-pwd');
   const err=document.getElementById('upload-pwd-err');
@@ -5326,6 +5361,11 @@ function triggerUpload(){
   if(UPLOAD_TARGET==='editarvendas'){
     fecharModal();
     abrirModalEV();
+    return;
+  }
+  if(UPLOAD_TARGET==='participacao'){
+    fecharModal();
+    abrirModalPU();
     return;
   }
   const id=UPLOAD_TARGET==='fat'?'upload-fat-input':'upload-vendas-input';
@@ -5529,6 +5569,68 @@ function salvarEdicaoVendas(){
   fecharModalEV();
   try{renderActive();}catch(e){}
   alert('✅ Vendas de '+dispName(u)+' em '+nomeMesCg(m)+' corrigidas para '+valor+'.\n\nJá vale AQUI NESTE COMPUTADOR/NAVEGADOR. Para valer em TODOS, clique em "🚀 Atualizar para Todos" (ou baixe o dados_base.json e suba pelo GitHub).');
+}
+// ══ PARTICIPAÇÃO DAS UNIDADES NAS CAMPANHAS (campMensalDesde / campPeriodoDesde) ══
+// Controla, unidade por unidade, a partir de quando ela entra no ranking da
+// Campanha Mensal e/ou da Campanha por Período (ver renderCampanhaMensal e
+// renderCampanhaPeriodo, que já respeitam esses dois campos). São campos
+// independentes — dá pra uma unidade participar de um tipo de campanha sem
+// participar do outro (ex.: unidade nova, que abriu no meio do mês).
+function abrirModalPU(){
+  const sel=document.getElementById('pu-unidade');
+  const units=Object.keys(D.unidades_info||{}).sort((a,b)=>dispName(a).localeCompare(dispName(b)));
+  sel.innerHTML=units.map(u=>`<option value="${u}">${dispName(u)}</option>`).join('');
+  document.getElementById('pu-err').textContent='';
+  puAtualizarAtual();
+  document.getElementById('pu-overlay').style.display='flex';
+}
+function fecharModalPU(){
+  document.getElementById('pu-overlay').style.display='none';
+}
+function puAtualizarAtual(){
+  const u=document.getElementById('pu-unidade').value;
+  const info=(D.unidades_info||{})[u]||{};
+  document.getElementById('pu-mensal').value=info.campMensalDesde||'';
+  document.getElementById('pu-periodo').value=info.campPeriodoDesde||'';
+}
+// Persiste D.unidades_info (+ metas_mensais) no mesmo formato usado pelo upload
+// de Cadastro (localStorage.ft_vendas_data._cadastro), pra não se perder no reload.
+function salvarCadastroLocalStorage(){
+  try{
+    const prevRaw=localStorage.getItem('ft_vendas_data');
+    const prev=prevRaw?JSON.parse(prevRaw):{};
+    prev._version='v3.1';
+    prev._cadastro={unidades_info:D.unidades_info, metas_mensais:D.metas_mensais, savedAt:new Date().toISOString()};
+    prev.vendas_monthly=D.vendas_monthly; prev.vendas_daily=D.vendas_daily;
+    prev.ativos_rec=D.ativos_rec; prev.ativos_rec_hist=D.ativos_rec_hist||{};
+    prev.ativos_plano=D.ativos_plano; prev.plano_mes=D.plano_mes; prev.vmeta=D.vmeta;
+    prev.plano_nomes=D.plano_nomes||{};
+    prev.fat_novas_daily=D.fat_novas_daily||{}; prev.fat_total_daily=D.fat_total_daily||{};
+    prev.receita_avulsa_loc_mensal=D.receita_avulsa_loc_mensal||{};
+    prev.tk_auto=D.tk_auto||{}; prev.churn_mensal=D.churn_mensal||{}; prev.conversao_mensal=D.conversao_mensal||{};
+    prev.savedAt=new Date().toISOString();
+    localStorage.setItem('ft_vendas_data',JSON.stringify(prev));
+  }catch(e){console.warn('salvar cadastro:',e);}
+}
+function salvarParticipacaoUnidade(){
+  const err=document.getElementById('pu-err');
+  err.textContent='';
+  const u=document.getElementById('pu-unidade').value;
+  if(!u){ err.textContent='❌ Selecione uma unidade.'; return; }
+  const mensal=document.getElementById('pu-mensal').value||null;
+  const periodo=document.getElementById('pu-periodo').value||null;
+
+  if(!D.unidades_info[u]){ err.textContent='❌ Unidade não encontrada.'; return; }
+  D.unidades_info[u].campMensalDesde=mensal;
+  D.unidades_info[u].campPeriodoDesde=periodo;
+
+  salvarCadastroLocalStorage();
+  fecharModalPU();
+  try{renderActive();}catch(e){}
+  alert('✅ Participação de '+dispName(u)+' atualizada.\n\n'
+    +'Campanha Mensal: '+(mensal?('a partir de '+mensal):'sem restrição (participa desde sempre)')+'\n'
+    +'Campanha por Período: '+(periodo?('a partir de '+periodo):'sem restrição (participa desde sempre)')+'\n\n'
+    +'Já vale AQUI NESTE COMPUTADOR/NAVEGADOR. Para valer em TODOS, clique em "🚀 Atualizar para Todos" (ou baixe o dados_base.json e suba pelo GitHub).');
 }
 function baixarJsonNovaUnidade(chave,info,alias){
   try{
