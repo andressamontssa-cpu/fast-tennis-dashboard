@@ -21,11 +21,35 @@
   .card{break-inside:avoid;page-break-inside:avoid;box-shadow:none!important;border:1px solid #ccc!important}
   @page{margin:12mm}
 }
-html{width:100%;margin:0;padding:0;overflow-x:hidden}
-body{width:100%;min-height:100vh;font-family:'Barlow',sans-serif;background:var(--light);color:var(--text);margin:0;padding:0;overflow-x:hidden;overflow-y:auto}
+/* Chrome (topbar/tabs) FIXO na viewport + wrapper dedicado (#embed-scroll) fazendo a
+   rolagem — não o body. Isso é o que de fato funciona dentro de um <iframe> de altura fixa
+   como o embed da LearnWorlds (confirmado por teste real): quando era o BODY quem rolava
+   (overflow-y:auto no body, topbar/tabs/fbar position:sticky), a rolagem ficava instável
+   dentro do iframe embutido e o conteúdo abaixo da dobra ficava cortado/inacessível. Com
+   html/body travados em overflow:hidden e um wrapper interno próprio (#embed-scroll) com
+   overflow-y:scroll, a rolagem passa a ser 100% previsível e local à página, independente
+   de como o iframe hospedeiro está configurado. topbar/tabs usam position:fixed (saem do
+   fluxo e ficam presos na viewport, mesmo estando dentro do wrapper). O fbar continua
+   position:sticky, mas agora gruda no topo do PRÓPRIO #embed-scroll (seu ancestral de
+   rolagem real) em vez de gruda em body/iframe — por isso funciona mesmo o fbar tendo
+   altura variável (os filtros quebram linha em telas estreitas). */
+html{width:100%;height:100%;margin:0;padding:0;overflow:hidden !important;overscroll-behavior:none}
+body{width:100%;height:100%;min-height:0 !important;font-family:'Barlow',sans-serif;background:var(--light);color:var(--text);margin:0;padding:0 !important;overflow:hidden !important;overscroll-behavior:none}
+
+#embed-scroll{
+  position:fixed;inset:0;width:100%;height:100%;height:100vh;height:100dvh;
+  padding-top:96px; /* = altura da topbar (56px) + altura das tabs (40px), ambas fixed */
+  overflow-x:hidden;overflow-y:scroll;
+  -webkit-overflow-scrolling:touch;
+  overscroll-behavior-y:contain;
+  touch-action:pan-y;
+  scrollbar-gutter:stable;
+}
+#embed-scroll:focus{outline:none}
+#embed-scroll > .panel:last-of-type{padding-bottom:48px}
 
 /* TOPBAR */
-.topbar{position:sticky;top:0;left:0;right:0;z-index:200;background:var(--navy);height:56px;display:flex;align-items:center;padding:0 20px;box-shadow:0 2px 12px rgba(0,0,0,.35)}
+.topbar{position:fixed;top:0;left:0;right:0;z-index:200;background:var(--navy);height:56px;display:flex;align-items:center;padding:0 20px;box-shadow:0 2px 12px rgba(0,0,0,.35)}
 .topbar-logo{flex-shrink:0}
 .topbar-center{flex:1;display:flex;flex-direction:column;align-items:center;line-height:1}
 .bi-tag{font-size:9px;font-weight:700;letter-spacing:3px;color:var(--green-lt);text-transform:uppercase}
@@ -33,13 +57,20 @@ body{width:100%;min-height:100vh;font-family:'Barlow',sans-serif;background:var(
 .hdr-date{color:rgba(255,255,255,.55);font-size:11px;text-align:right;flex-shrink:0}
 
 /* TABS */
-.tabs{position:sticky;top:56px;left:0;right:0;z-index:199;background:#fff;border-bottom:2px solid var(--border);display:flex;padding:0 20px;overflow-x:auto;height:40px;align-items:center}
+.tabs{position:fixed;top:56px;left:0;right:0;z-index:199;background:#fff;border-bottom:2px solid var(--border);display:flex;padding:0 20px;overflow-x:auto;height:40px;align-items:center}
 .tab{padding:9px 15px;border:none;background:none;cursor:pointer;font-family:'Barlow',sans-serif;font-size:12px;font-weight:600;color:var(--gray);border-bottom:3px solid transparent;margin-bottom:-2px;white-space:nowrap;transition:.15s}
 .tab.active{color:var(--blue);border-bottom-color:var(--blue)}
 .tab:hover{color:var(--blue)}
 
-/* FILTERS — sticky under tabs */
-.fbar{background:#fff;border-bottom:1px solid var(--border);padding:6px 20px;display:flex;align-items:center;gap:7px;flex-wrap:wrap;position:sticky;top:96px;left:0;right:0;z-index:198;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+/* FILTERS — fixed logo abaixo das tabs (não "sticky": dentro de um wrapper que já é
+   position:fixed + overflow:scroll, o Chromium calcula errado o offset do sticky —
+   soma o padding-top do wrapper ao "top" do sticky em vez de tratá-los como a mesma
+   coisa, empurrando a barra pra baixo e deixando as tabelas do topo de cada aba
+   escondidas atrás dela. Com fixed simples — igual topbar/tabs — e o padding-top do
+   #embed-scroll ajustado via JS (função ajustarChromeFixo, chamada a cada troca de aba
+   e a cada resize, via ResizeObserver) para acompanhar a altura real do fbar, que varia
+   conforme os filtros quebram ou não linha — o comportamento fica 100% previsível). */
+.fbar{background:#fff;border-bottom:1px solid var(--border);padding:6px 20px;display:flex;align-items:center;gap:7px;flex-wrap:wrap;position:fixed;top:96px;left:0;right:0;z-index:198;box-shadow:0 1px 4px rgba(0,0,0,.06)}
 .fl{font-size:10px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:1px;white-space:nowrap}
 .fsel{padding:4px 8px;border:1.5px solid var(--border);border-radius:6px;font-size:11px;font-family:'Barlow',sans-serif;background:#fff;color:var(--text);cursor:pointer;outline:none;transition:.15s;max-width:160px}
 .fsel:focus{border-color:var(--blue)}
@@ -128,6 +159,12 @@ body{width:100%;min-height:100vh;font-family:'Barlow',sans-serif;background:var(
 .upload-btn:hover{background:var(--navy)}
 ::-webkit-scrollbar{width:4px;height:4px}
 ::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+/* Barra de rolagem HORIZONTAL um pouco mais grossa/visível que a vertical — tabelas e faixas
+   de KPI largas (Bom Dia Vendas, Raio X, etc.) rolam de lado dentro do próprio card, e essa
+   barrinha é o único sinal visual disso. Dentro do embed da LearnWorlds, sem esse contraste
+   maior, ela é fina demais pra notar e a tabela parece só "cortada", sem jeito de ver o resto. */
+[style*="overflow-x:auto"]::-webkit-scrollbar,[style*="overflow-x: auto"]::-webkit-scrollbar{height:9px}
+[style*="overflow-x:auto"]::-webkit-scrollbar-thumb,[style*="overflow-x: auto"]::-webkit-scrollbar-thumb{background:var(--gray);border-radius:5px}
 
 /* Ranking sub-tabs */
 .rtab{padding:8px 18px;border:none;background:none;cursor:pointer;font-family:'Barlow',sans-serif;font-size:12px;font-weight:600;color:var(--gray);border-bottom:3px solid transparent;margin-bottom:-2px;transition:.15s;white-space:nowrap}
@@ -140,6 +177,10 @@ body{width:100%;min-height:100vh;font-family:'Barlow',sans-serif;background:var(
 .finp:focus{border-color:var(--blue)}
 .btn-calc{padding:8px 20px;background:var(--blue);color:#fff;border:none;border-radius:6px;font-family:'Barlow',sans-serif;font-weight:700;font-size:13px;cursor:pointer;white-space:nowrap;transition:.15s}
 .btn-calc:hover{background:var(--navy)}
+
+/* Overlays/modais precisam ficar SEMPRE fixed relativo à viewport, nunca ao #embed-scroll —
+   caso contrário ficariam presos/cortados dentro da área rolável em vez de cobrir a tela toda. */
+#upload-overlay,#insight-list-overlay,#nu-overlay,#ev-overlay,#pu-overlay,#modal-upload{position:fixed !important}
 
 /* ── UPLOAD MODAL */
 #upload-overlay{display:none;position:fixed;inset:0;background:rgba(2,45,138,.6);z-index:9000;align-items:center;justify-content:center;backdrop-filter:blur(3px)}
@@ -160,20 +201,22 @@ body{width:100%;min-height:100vh;font-family:'Barlow',sans-serif;background:var(
   .tbl th.sortable{cursor:pointer;user-select:none;transition:color .15s}
   .tbl th.sortable:hover{color:var(--blue)}
 
-/* Todos os blocos de indicador (KPI), em todas as abas: sempre em UMA linha só —
-   nunca quebram para uma segunda linha e nunca exigem rolagem horizontal.
-   As caixinhas encolhem (e a fonte reduz um pouco) conforme a quantidade de
-   blocos e o espaço disponível, mas o texto pode quebrar dentro da própria
-   caixinha quando necessário, para continuar legível. */
-.kpi-row{flex-wrap:nowrap}
-.kpi{min-width:0;flex:1 1 0;padding:8px 7px}
+/* Todos os blocos de indicador (KPI), em todas as abas: nunca exigem rolagem
+   horizontal. Cada caixinha tem uma largura mínima (o suficiente pra um valor
+   em R$ típico, tipo "R$ 5.475.594", caber numa linha só sem quebrar no meio
+   do número) — quando há blocos demais pra largura da tela (abas com muitos
+   KPIs, como Faturamento), a linha continua na(s) linha(s) de baixo em vez de
+   espremer as caixinhas até o texto quebrar feio. Em telas largas o suficiente
+   pra caber todos os blocos, tudo continua numa linha só, como antes. */
+.kpi-row{flex-wrap:wrap}
+.kpi{min-width:112px;flex:1 1 0;padding:8px 7px}
 .kpi-lbl{font-size:9.5px;white-space:normal;line-height:1.2;overflow-wrap:break-word}
-.kpi-val{font-size:19px;overflow-wrap:break-word}
+.kpi-val{font-size:16px;overflow-wrap:break-word}
 .kpi-sub{font-size:9.5px;white-space:normal;line-height:1.25;overflow-wrap:break-word}
 </style>
 </head>
 <body>
-
+<div id="embed-scroll" tabindex="0">
 <!-- TELA DE ACESSO — bloqueia a visualização do dashboard até digitar a senha.
      Repositório fica público no GitHub Pages, então esta tela evita que quem
      esbarrar no link por acaso veja dados financeiros sem querer. Não é uma
@@ -212,6 +255,8 @@ try{
     <input type="file" id="upload-fat-input" accept=".csv,.xlsx,.xls" style="display:none" onchange="processarArquivoFat(this)">
     <button class="upload-btn" id="upload-btn-novaunidade" onclick="abrirModal('novaunidade')" title="Cadastrar uma unidade nova (recém-inaugurada) para que ela já apareça no dashboard e seja reconhecida nos próximos uploads">➕ Nova Unidade</button>
     <button class="upload-btn" id="upload-btn-editarvendas" onclick="abrirModal('editarvendas')" title="Corrigir manualmente o número de Vendas de uma unidade num mês específico — para dados que vêm de um sistema à parte e não passam pelos uploads normais">✏️ Editar Vendas</button>
+    <button class="upload-btn" id="upload-btn-contatos" onclick="abrirModal('contatos')" title="Planilha 'Dados cadastrais unidades e franqueados' (aba 'Unidades em Operação') — carrega nome/e-mail do franqueado (usado na aba 📧 Fechamento) e a divisão real de Quadras Adulto/Infantil por unidade">📇 Contatos Franqueados</button>
+    <input type="file" id="upload-contatos-input" accept=".csv,.xlsx,.xls" style="display:none" onchange="processarArquivoContatos(this)">
     <button onclick="publicarDadosGitHub()" title="Depois de subir todas as bases do mês (Metas, Base de Clientes, Custo Fixo, Leads/Conversão), clique aqui para publicar os dados atualizados direto no GitHub. Em 1-2 minutos, todo mundo que abrir o link vê os dados novos — automaticamente, sem precisar subir arquivo nenhum manualmente." style="background:#053CD8;border:1px solid #053CD8;color:#fff;border-radius:6px;padding:6px 10px;font-size:11px;font-weight:700;cursor:pointer;margin-right:6px;flex-shrink:0">🚀 Atualizar para Todos</button>
     <button onclick="window.print()" title="Exportar aba atual para PDF (usa a impressão do navegador — escolha 'Salvar como PDF')" style="background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);color:#fff;border-radius:6px;padding:6px 10px;font-size:11px;font-weight:700;cursor:pointer;margin-right:6px;flex-shrink:0">🖨️ Exportar PDF</button>
     <button onclick="limparCacheLocal()" title="Se algum número parecer travado/desatualizado mesmo após atualizar o arquivo, use este botão para limpar dados salvos no navegador (uploads antigos de Metas do Mês, Base de Clientes, Custo Fixo) e recarregar do zero" style="background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);color:#fff;border-radius:6px;padding:6px 10px;font-size:11px;font-weight:700;cursor:pointer;margin-right:6px;flex-shrink:0">🧹 Limpar Cache Local</button>
@@ -230,6 +275,7 @@ try{
   <button class="tab" onclick="switchTab('meta',this)">🧩 Mix de Produtos</button>
   <button class="tab" onclick="switchTab('quadras',this)">🎾 Visão por Quadras</button>
   <button class="tab" onclick="switchTab('ranking',this)">🏆 Ranking Campanhas</button>
+  <button class="tab" onclick="switchTab('fechamento',this)">📧 Fechamento</button>
 </div>
 
 <div class="fbar">
@@ -249,6 +295,31 @@ try{
   <select class="fsel" id="f-gerente" onchange="onFChange()"><option value="">Todos os Gerentes</option></select>
   <button class="btn-clear" onclick="clearF()">✕ Limpar</button>
 </div>
+<script>
+// ── Ajusta dinamicamente o espaço reservado pro chrome fixo (topbar+tabs+fbar) ─────
+// topbar e tabs têm altura fixa, mas o fbar (barra de filtros) varia de altura: em
+// telas estreitas, ou quando cabem menos filtros na largura disponível, os selects
+// quebram pra 2ª linha (flex-wrap:wrap) e o fbar fica mais alto. Se o padding-top do
+// #embed-scroll (e o "top" do próprio fbar) não acompanhar essa altura real, o topo de
+// cada aba fica escondido atrás do fbar — exatamente o "cortando" relatado dentro do
+// embed da LearnWorlds, cujo iframe costuma renderizar bem mais estreito que um
+// desktop comum. Roda a cada troca de aba (os filtros exibidos mudam por aba) e a
+// cada resize/mudança de altura do fbar (via ResizeObserver).
+function ajustarChromeFixo(){
+  const topbar=document.querySelector('.topbar'), tabs=document.querySelector('.tabs'), fbar=document.querySelector('.fbar'), es=document.getElementById('embed-scroll');
+  if(!topbar||!tabs||!fbar||!es)return;
+  const hTopbar=topbar.offsetHeight, hTabs=tabs.offsetHeight, hFbar=fbar.offsetHeight;
+  tabs.style.top=hTopbar+'px';
+  fbar.style.top=(hTopbar+hTabs)+'px';
+  es.style.paddingTop=(hTopbar+hTabs+hFbar)+'px';
+}
+window.addEventListener('resize',ajustarChromeFixo);
+window.addEventListener('DOMContentLoaded',ajustarChromeFixo);
+ajustarChromeFixo();
+try{
+  new ResizeObserver(ajustarChromeFixo).observe(document.querySelector('.fbar'));
+}catch(e){/* ResizeObserver indisponível — ajusteChromeFixo() ainda roda no load/resize/switchTab */}
+</script>
 
 <!-- PANEL RESUMO -->
 <div id="panel-resumo" class="panel active">
@@ -456,7 +527,7 @@ try{
       </div>
     </div>
     <div style="overflow-x:auto"><table class="tbl">
-      <thead><tr><th>#</th><th>Unidade</th><th>Estado</th><th>Gerente</th><th class="tr">Meta</th><th class="tr">Vendas</th><th class="tr">% Meta</th><th>Progresso</th></tr></thead>
+      <thead><tr><th>#</th><th>Unidade</th><th>Estado</th><th>Gerente</th><th class="tr">Meta</th><th class="tr">Vendas</th><th class="tr">% Meta</th><th class="tr">Churn (%)</th><th class="tr">Adições Líquidas</th><th>Progresso</th></tr></thead>
       <tbody id="tbody-c"></tbody>
     </table></div>
   </div>
@@ -515,7 +586,10 @@ try{
     <button id="rtab-mensal"  class="rtab active"  onclick="switchRTab('mensal')" >📆 Campanha Mensal</button>
     <button id="rtab-periodo" class="rtab"          onclick="switchRTab('periodo')">📅 Campanha por Período</button>
     <button id="rtab-comparativo" class="rtab"      onclick="switchRTab('comparativo')">📈 Comparativo de Períodos</button>
-    <button style="margin-left:auto;align-self:center;background:#053CD8;border:none;color:#fff;border-radius:6px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer" onclick="abrirModal('participacao')" title="Definir a partir de quando cada unidade participa da Campanha Mensal e/ou da Campanha por Período — útil para unidades novas, que abriram no meio do mês e podem entrar numa campanha sem entrar na outra">⚙️ Participação das Unidades</button>
+    <div style="margin-left:auto;align-self:center;display:flex;gap:8px">
+      <button style="background:#0a7a00;border:none;color:#fff;border-radius:6px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer" onclick="abrirModal('novaunidadecampanha')" title="Cadastrar uma unidade nova (ex.: que abriu no meio do mês) direto por aqui, sem sair da aba. Esse cadastro sozinho NÃO afeta Faturamento, Raio X ou outras abas — a unidade só passa a contar nelas quando você subir uma base (Metas, Vendas, Faturamento) que a inclua. Depois de cadastrar, já te levo para definir a participação dela nas campanhas.">➕ Cadastrar Unidade</button>
+      <button style="background:#053CD8;border:none;color:#fff;border-radius:6px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer" onclick="abrirModal('participacao')" title="Definir a partir de quando cada unidade participa da Campanha Mensal e/ou da Campanha por Período — útil para unidades novas, que abriram no meio do mês e podem entrar numa campanha sem entrar na outra">⚙️ Participação das Unidades</button>
+    </div>
   </div>
 
   <!-- ── CAMPANHA MENSAL ── -->
@@ -849,6 +923,7 @@ try{
            onkeydown="if(event.key==='Enter')tentarSenha();if(event.key==='Escape')fecharModal()">
     <div id="upload-pwd-err"></div>
     <button id="upload-go" disabled onclick="triggerUpload()">📂 Carregar Base</button>
+    <p style="text-align:center;margin:8px 0 0"><a href="#" onclick="recuperarSenha();return false;" style="font-size:11px;color:#053CD8;text-decoration:underline">🔑 Esqueci minha senha</a></p>
     <p style="font-size:10px;color:var(--gray);margin-top:6px;text-align:center">Você pode selecionar vários arquivos de uma vez — cada um é identificado e enviado ao fluxo certo automaticamente.</p>
   </div>
 </div>
@@ -1195,6 +1270,87 @@ try{
       <div id="cgm-indicadores" style="display:flex;flex-wrap:wrap;gap:4px 14px;padding:6px 0 4px;font-size:11px"></div>
     </div>
     <div style="overflow-x:auto;padding:0 16px 16px"><table class="tbl" id="cgm-tabela"></table></div>
+  </div>
+</div>
+
+<div class="panel" id="panel-fechamento">
+  <div class="card" style="margin-bottom:12px">
+    <div class="card-hd"><span class="card-title">📧 <span id="fech-titulo-aba">Fechamento</span> — E-mail para Franqueado</span></div>
+    <div style="padding:12px 16px 4px;font-size:11px;color:var(--gray)">Gera o e-mail de fechamento do mês anterior + metas do mês atual para uma unidade específica, pronto para copiar e colar no Gmail ou Outlook.</div>
+    <div style="padding:8px 16px;display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;align-items:end">
+      <div><label class="finp-lbl">Gestor Responsável</label>
+        <select id="fech-gestor" class="finp" onchange="fechGestorMudou()"></select></div>
+      <div><label class="finp-lbl">Unidade (Franqueado)</label>
+        <select id="fech-unidade" class="finp" onchange="renderFechamento()"></select></div>
+      <div><label class="finp-lbl">Mês de Fechamento</label>
+        <select id="fech-mes" class="finp" onchange="fechMesFechadoMudou()"></select></div>
+      <div><label class="finp-lbl">Mês da Meta Atual</label>
+        <select id="fech-mes-atual" class="finp" onchange="renderFechamento()"></select></div>
+    </div>
+    <div id="fech-header" style="padding:8px 16px 4px;font-size:12px;color:var(--gray)"></div>
+    <div style="padding:8px 16px 16px;display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;align-items:end;border-top:1px solid var(--border);margin-top:8px">
+      <div><label class="finp-lbl">Nome do Franqueado</label>
+        <input type="text" id="fech-contato-nome" class="finp" placeholder="ex.: João Silva"></div>
+      <div><label class="finp-lbl">E-mail do Franqueado</label>
+        <input type="email" id="fech-contato-email" class="finp" placeholder="ex.: joao@exemplo.com"></div>
+      <div><button class="btn-a sol" onclick="fechSalvarContato()">💾 Salvar Contato</button></div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:12px">
+    <div class="card-hd"><span class="card-title">🎾 Vendas</span></div>
+    <div id="fech-kpi-vendas" style="padding:12px 16px"></div>
+  </div>
+
+  <div class="card" style="margin-bottom:12px">
+    <div class="card-hd"><span class="card-title">💰 Faturamento</span></div>
+    <div id="fech-kpi-fat" style="padding:12px 16px"></div>
+  </div>
+
+  <div class="card" style="margin-bottom:12px">
+    <div class="card-hd"><span class="card-title">📊 Indicadores Comerciais</span></div>
+    <div id="fech-kpi-comercial" style="padding:12px 16px"></div>
+  </div>
+
+  <div class="card" style="margin-bottom:12px">
+    <div class="card-hd"><span class="card-title">📈 Evolução dos Últimos 3 Meses</span></div>
+    <div style="padding:12px 16px">
+      <div style="max-width:640px;margin:0 auto 12px"><canvas id="fech-chart-evolucao" height="140"></canvas></div>
+      <div id="fech-evolucao-tabela"></div>
+      <div id="fech-evolucao-resumo" style="margin-top:10px"></div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:12px">
+    <div class="card-hd"><span class="card-title">💡 Insights Automáticos</span></div>
+    <div id="fech-insights-lista" style="padding:12px 16px"></div>
+  </div>
+
+  <div class="card" style="margin-bottom:12px">
+    <div class="card-hd"><span class="card-title">🎯 Metas do Mês Atual</span></div>
+    <div id="fech-metas-atual" style="padding:12px 16px"></div>
+  </div>
+
+  <div class="card" style="margin-bottom:12px">
+    <div class="card-hd"><span class="card-title">👁️ Prévia do E-mail</span></div>
+    <div style="padding:16px;background:#F0F2F8">
+      <div id="fech-preview" style="background:#fff;border-radius:8px;overflow:hidden;max-width:640px;margin:0 auto"></div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:12px">
+    <div class="card-hd" style="cursor:pointer" onclick="fechToggleAcoes()">
+      <span class="card-title">📥 <span id="fech-acoes-toggle-ic">▸</span> Gerar e-mail HTML | Fechamento mensal da unidade</span>
+    </div>
+    <div id="fech-acoes-body" style="display:none">
+      <div style="padding:12px 16px;font-size:12px;color:var(--gray)">O e-mail acima já está pronto — use os botões abaixo para copiar ou baixar. O visual é idêntico ao Dashboard e compatível com Gmail e Outlook.</div>
+      <div style="padding:0 16px 16px;display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn-a sol" onclick="fechCopiarEmail()">📋 Copiar E-mail</button>
+        <button class="btn-a" onclick="fechBaixarArquivo()">💾 Baixar Arquivo HTML</button>
+        <button class="btn-a" onclick="fechCopiarAssunto()">✉️ Copiar Assunto</button>
+        <button class="btn-a" onclick="fechCopiarDestinatarios()">👥 Copiar Destinatários</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -1567,10 +1723,23 @@ function buildData(){
       meta=allMesesD.reduce((s,m)=>s+((D.metas_mensais[m]||{})[u]||0),0);
       vendas=Object.values(csvMon[u]||{}).reduce((s,v)=>s+v,0);
     }
+    // Churn e Adições Líquidas: soma no(s) mês(es) em vista (D.churn_mensal[u][mês]) —
+    // mesma fonte usada nas abas Faturamento/Resumo, calculada por cliente único no upload
+    // da Base de Clientes.
+    const chMeses=mKey?[mKey]:allMesesD;
+    let churnAtivos=0, churnChurned=0, churnTem=false;
+    chMeses.forEach(m=>{
+      const c=D.churn_mensal&&D.churn_mensal[u]?D.churn_mensal[u][m]:null;
+      if(!c)return;
+      churnTem=true; churnAtivos+=c.ativosInicio||0; churnChurned+=c.churned||0;
+    });
+    const churnPctU=churnTem&&churnAtivos>0?churnChurned/churnAtivos:null;
+    const addLiqU=churnTem?vendas-churnChurned:null;
     return{u,name:dispName(u),
       estado:info.estado||'',cidade:info.cidade||'',gerente:info.gerente||'',regiao:info.regiao||'',
       qda_ad:info.qda_ad||0,qda_inf:info.qda_inf||0,qda_total:info.qda_total||0,
       meta,vendas,pct:meta>0?vendas/meta:0,
+      churn:churnPctU,churned:churnTem?churnChurned:null,churnAtivosIni:churnTem?churnAtivos:null,addLiq:addLiqU,
       ativos_rec:D.ativos_rec[u]||0,ativos_plano:D.ativos_plano[u]||0,
       dus,mKey:mKeyForDus
     };
@@ -1595,6 +1764,9 @@ function switchTab(tab,btn){
     if(rn)rn.dataset.synced=''; // força resincronizar mês/unidade com o filtro global a cada entrada na aba
   }
   renderActive();
+  // o fbar pode mudar de altura (quebra de linha dos filtros) dependendo da aba/largura —
+  // reajusta o espaço reservado pro chrome fixo pra não deixar o topo da aba escondido.
+  if(typeof ajustarChromeFixo==='function')requestAnimationFrame(ajustarChromeFixo);
 }
 
 // ── RAIO X DA UNIDADE ──────────────────────────────────────────────
@@ -1792,9 +1964,708 @@ function renderRaioX(){
     )+
     secao('🎾 Ocupação',
       (!D.ocupacao_real||!Object.keys(D.ocupacao_real).length?'<div style="grid-column:1/-1;background:#FFF3E0;border:1px solid #FFCC80;border-radius:8px;padding:10px 12px;font-size:12px;color:#b37000"><strong>⚠️ Ocupação de quadra não calculada.</strong> Suba a planilha de Base de Clientes (botão "📂 Carregar Base") — ela precisa ter as colunas "Agendamento 1" a "Agendamento 6" e "Plano". Confira o aviso no canto superior direito após subir, ao lado da data.</div>':'')+
-      itemAprox('Ocupação Quadra Adulto (%)',a.ocupRealAdulto!=null?rxFmtPct(a.ocupRealAdulto):(ocup&&ocup.adulto!=null?rxFmtPct(ocup.adulto):'–'),a.ocupRealAdulto!=null?'agenda de clientes ativos ÷ quadras · Seg-Sex 06h-22h, Sáb 06h-15h':(ultimaLeituraOcup?'última leitura: '+(FAT_MESES_NOME[ultimaLeituraOcup]||ultimaLeituraOcup):'sem leitura disponível'))+
-      itemAprox('Ocupação Quadra Infantil (%)',a.ocupRealInfantil!=null?rxFmtPct(a.ocupRealInfantil):(ocup&&ocup.infantil!=null?rxFmtPct(ocup.infantil):'–'),a.ocupRealInfantil!=null?'agenda de clientes ativos ÷ quadras · Seg-Sex 06h-22h, Sáb 06h-15h':(ultimaLeituraOcup?'última leitura: '+(FAT_MESES_NOME[ultimaLeituraOcup]||ultimaLeituraOcup):'sem leitura disponível'))
+      itemAprox('Ocupação Quadra Adulto (%)',a.ocupRealAdulto!=null?rxFmtPct(a.ocupRealAdulto):(ocup&&ocup.adulto!=null?rxFmtPct(ocup.adulto):'–'),a.ocupRealAdulto!=null?'agenda de clientes ativos ÷ quadras · Seg-Sex e Dom 06h-22h, Sáb 06h-15h':(ultimaLeituraOcup?'última leitura: '+(FAT_MESES_NOME[ultimaLeituraOcup]||ultimaLeituraOcup):'sem leitura disponível'))+
+      itemAprox('Ocupação Quadra Infantil (%)',a.ocupRealInfantil!=null?rxFmtPct(a.ocupRealInfantil):(ocup&&ocup.infantil!=null?rxFmtPct(ocup.infantil):'–'),a.ocupRealInfantil!=null?'agenda de clientes ativos ÷ quadras · Seg-Sex e Dom 06h-22h, Sáb 06h-15h':(ultimaLeituraOcup?'última leitura: '+(FAT_MESES_NOME[ultimaLeituraOcup]||ultimaLeituraOcup):'sem leitura disponível'))
     );
+}
+
+
+// ==== FECHAMENTO DO MÊS -- E-mail para Franqueado ==========================
+// Gera um e-mail de fechamento (mês anterior fechado + metas do mês atual) por
+// unidade, reaproveitando a MESMA fonte de dados/fórmulas que o resto do
+// dashboard já usa (rxAgg -- a mesma função por trás do Raio X e do
+// Comparativo Geral) para garantir que os números batam com o que a Andressa
+// já vê em outras abas. Os cards/gráfico na tela usam o CSS normal do
+// dashboard (flex/grid); o CORPO DO E-MAIL (fechRenderCorpoEmail) é montado
+// só com <table> e estilos inline, porque Outlook desktop (motor do Word) não
+// suporta display:flex/grid nem gradientes -- só tabela é garantia real de
+// compatibilidade Gmail + Outlook.
+const MESES_PT_NOMES=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+const FECH_SEM_DADO='Informação não disponível';
+function fechNomeMes(mk,minusculo){
+  const m=+mk.split('-')[1];
+  const n=MESES_PT_NOMES[m-1]||mk;
+  return minusculo?n.toLowerCase():n;
+}
+function fechMesSeguinte(mk){
+  const [y,m]=mk.split('-').map(Number);
+  const y2=m===12?y+1:y, m2=m===12?1:m+1;
+  return y2+'-'+String(m2).padStart(2,'0');
+}
+function fechMesAnterior(mk){
+  const [y,m]=mk.split('-').map(Number);
+  const y2=m===1?y-1:y, m2=m===1?12:m-1;
+  return y2+'-'+String(m2).padStart(2,'0');
+}
+function fechPct(v){ return v==null?FECH_SEM_DADO:(v*100).toFixed(1)+'%'; }
+function fechMoney(v){ return v==null?FECH_SEM_DADO:fatBR(v); }
+function fechCorAtingimento(pct){
+  if(pct==null)return {bg:'#F0F0F0',fg:'#8A96B0'};
+  if(pct>=1)return {bg:'#DEF7EC',fg:'#03543F'};
+  if(pct>=0.9)return {bg:'#FEF3C7',fg:'#92400E'};
+  return {bg:'#FDE2E1',fg:'#9B1C1C'};
+}
+function fechCorDelta(delta,limiar){
+  limiar=limiar==null?0:limiar;
+  if(delta==null)return {bg:'#F0F0F0',fg:'#8A96B0'};
+  if(delta>limiar)return {bg:'#DEF7EC',fg:'#03543F'};
+  if(delta>=-limiar)return {bg:'#FEF3C7',fg:'#92400E'};
+  return {bg:'#FDE2E1',fg:'#9B1C1C'};
+}
+function fechClassificarTendencia(pctVar){
+  if(pctVar==null)return null;
+  if(pctVar>0.02)return 'crescimento';
+  if(pctVar<-0.02)return 'queda';
+  return 'estável';
+}
+// ── Contatos do franqueado (nome/e-mail) -- duas camadas: (1) a planilha "Dados cadastrais
+// unidades e franqueados" (📇 Contatos Franqueados), carregada em D.contatos_franqueados; (2) uma
+// edição manual pontual feita aqui na aba Fechamento (botão "Salvar Contato"), guardada à parte no
+// localStorage. A manual sempre GANHA da planilha quando existir -- é o jeito de corrigir um
+// contato específico sem esperar a Andressa subir a planilha inteira de novo.
+function fechContatoGet(u){
+  try{
+    const manual=JSON.parse(localStorage.getItem('ft_contatos_franqueados')||'{}')[u];
+    if(manual&&(manual.nome||manual.email))return manual;
+  }catch(e){}
+  return (D.contatos_franqueados&&D.contatos_franqueados[u])||null;
+}
+function fechContatoSet(u,nome,email){
+  try{
+    const all=JSON.parse(localStorage.getItem('ft_contatos_franqueados')||'{}');
+    all[u]={nome:(nome||'').trim(),email:(email||'').trim()};
+    localStorage.setItem('ft_contatos_franqueados',JSON.stringify(all));
+  }catch(e){ console.warn('contato franqueado:',e); }
+}
+function fechSalvarContato(){
+  const uSel=document.getElementById('fech-unidade');
+  if(!uSel||!uSel.value){alert('Selecione a unidade primeiro.');return;}
+  const nome=document.getElementById('fech-contato-nome').value;
+  const email=document.getElementById('fech-contato-email').value;
+  fechContatoSet(uSel.value,nome,email);
+  alert('Contato salvo para '+dispName(uSel.value)+'.');
+  renderFechamento();
+}
+// ── Filtros (Gestor cascateia Unidade; os dois meses são independentes) ────
+function fechFillSelects(){
+  const gSel=document.getElementById('fech-gestor'), uSel=document.getElementById('fech-unidade'),
+        mSel=document.getElementById('fech-mes'), maSel=document.getElementById('fech-mes-atual');
+  if(!gSel||!uSel||!mSel||!maSel)return;
+  if(!gSel.options.length){
+    const gestores=[...new Set(Object.values(D.unidades_info).map(x=>x.gerente).filter(Boolean))].sort();
+    gSel.innerHTML='<option value="">Todos os gestores</option>'+gestores.map(g=>`<option value="${g.replace(/"/g,'&quot;')}">${g}</option>`).join('');
+  }
+  if(!uSel.options.length){
+    fechPopularUnidades('');
+  }
+  if(!mSel.options.length){
+    const meses=Object.keys(D.fat_data||{}).sort();
+    mSel.innerHTML=meses.map(m=>`<option value="${m}">${FAT_MESES_NOME[m]||m}</option>`).join('');
+    // Default = penúltimo mês disponível: o último mês costuma ser o mês corrente (ainda em
+    // andamento, sem fechamento) -- o penúltimo é o mês que de fato já fechou.
+    if(meses.length>1)mSel.value=meses[meses.length-2];
+    else if(meses.length)mSel.value=meses[meses.length-1];
+    fechAtualizarMesAtualOptions();
+  }
+}
+function fechPopularUnidades(gestor){
+  const uSel=document.getElementById('fech-unidade'); if(!uSel)return;
+  const atual=uSel.value;
+  let units=Object.keys(D.unidades_info);
+  if(gestor)units=units.filter(u=>(D.unidades_info[u]||{}).gerente===gestor);
+  units=units.sort((a,b)=>dispName(a).localeCompare(dispName(b)));
+  uSel.innerHTML=units.map(u=>`<option value="${u.replace(/"/g,'&quot;')}">${dispName(u)}</option>`).join('');
+  if(units.includes(atual))uSel.value=atual;
+}
+function fechGestorMudou(){
+  const gSel=document.getElementById('fech-gestor');
+  fechPopularUnidades(gSel?gSel.value:'');
+  renderFechamento();
+}
+// Sempre que o mês de fechamento muda, sugere automaticamente o mês seguinte
+// como "mês da meta atual" -- mas o campo continua editável independentemente
+// (ela pode trocar pra outro mês se quiser planejar mais à frente).
+function fechAtualizarMesAtualOptions(){
+  const mSel=document.getElementById('fech-mes'), maSel=document.getElementById('fech-mes-atual');
+  if(!mSel||!maSel||!mSel.value)return;
+  const mesFechado=mSel.value;
+  const sugerido=fechMesSeguinte(mesFechado);
+  const meses=new Set(Object.keys(D.fat_data||{}));
+  meses.add(sugerido); meses.add(fechMesSeguinte(sugerido));
+  const lista=[...meses].sort();
+  maSel.innerHTML=lista.map(m=>`<option value="${m}">${FAT_MESES_NOME[m]||m}</option>`).join('');
+  maSel.value=sugerido;
+}
+function fechMesFechadoMudou(){
+  fechAtualizarMesAtualOptions();
+  renderFechamento();
+}
+// ── Coleta de dados (única fonte -- rxAgg, a mesma do Raio X/Comparativo) ──
+function fechColetarDados(unidade,mesFechado,mesAtualK){
+  const allUnits=Object.keys(D.unidades_info);
+  const mesAnt1=fechMesAnterior(mesFechado);
+  const mesAnt2=fechMesAnterior(mesAnt1);
+  const a=rxAgg(mesFechado,[unidade]);
+  const aRede=rxAgg(mesFechado,allUnits);
+  const recFechado=(D.fat_data[mesFechado]||{})[unidade]||{};
+  const recAtual=(D.fat_data[mesAtualK]||{})[unidade]||{};
+  const mv=recFechado.mv||0;
+  const mvAtual=recAtual.mv||0;
+  const fmAtual=recAtual.fm||0;
+  const [ay,am]=mesAtualK.split('-').map(Number);
+  const dusAtualMes=calcDUsMes(ay,am-1);
+  const vendasPorDia=(mvAtual>0&&dusAtualMes>0)?mvAtual/dusAtualMes:null;
+  const fatPorDia=(fmAtual>0&&dusAtualMes>0)?fmAtual/dusAtualMes:null;
+  // Evolução: Vendas/Faturamento/Conversão têm histórico real por mês. Ticket Médio TEM histórico
+  // real também, mas só quando o próprio mês trouxe uma coluna de Ticket própria (ex.: planilha
+  // antiga de Acompanhamento da Rede, meses até 2026-07) — nesse caso D.fat_data[mk][unidade].tk
+  // já vem gravado com o valor certo DAQUELE mês, e usamos ele. D.tk_auto (Base de Clientes) por
+  // outro lado NÃO tem histórico — é sempre a foto mais recente, então só serve de aproximação pro
+  // mês de FECHAMENTO (o mais atual dos 3) quando o mês não tiver um tk próprio gravado; nos meses
+  // mais antigos sem tk próprio fica "Informação não disponível" em vez de repetir o mesmo número
+  // da foto atual (o que pareceria histórico sem ser).
+  const mesesEvolucao=[mesAnt2,mesAnt1,mesFechado];
+  const evolucao=mesesEvolucao.map((mk,idx)=>{
+    const ai=rxAgg(mk,[unidade]);
+    const mvMk=((D.fat_data[mk]||{})[unidade]||{}).mv||0;
+    const tkGravadoMk=((D.fat_data[mk]||{})[unidade]||{}).tk||0;
+    const tkMes=tkGravadoMk>0?tkGravadoMk:(idx===mesesEvolucao.length-1?a.tk:null);
+    return {
+      mk,
+      vReal:ai.vReal, mv:mvMk, atingVendas:mvMk>0?ai.vReal/mvMk:null,
+      tend:ai.tend, fm:ai.fm, atingFat:ai.fm>0?ai.tend/ai.fm:null,
+      conversao:ai.conversao,
+      tk: tkMes
+    };
+  });
+  return {
+    unidade, mesFechado, mesAtualK,
+    info:D.unidades_info[unidade]||{},
+    contato:fechContatoGet(unidade),
+    a, aRede, mv, mvAtual, fmAtual,
+    dusAtualMes, vendasPorDia, fatPorDia,
+    evolucao
+  };
+}
+// ── Ranking de indicadores (melhor resultado / maior atenção) ──────────────
+function fechRankearIndicadores(d){
+  const e1=d.evolucao[1], e2=d.evolucao[2];
+  const candidatos=[
+    {chave:'vReal',label:'Vendas Realizadas',base:e1.vReal,atual:e2.vReal},
+    {chave:'atingVendas',label:'Atingimento de Vendas',base:e1.atingVendas,atual:e2.atingVendas},
+    {chave:'tend',label:'Faturamento Realizado',base:e1.tend,atual:e2.tend},
+    {chave:'atingFat',label:'Atingimento de Faturamento',base:e1.atingFat,atual:e2.atingFat},
+    {chave:'conversao',label:'Conversão',base:e1.conversao,atual:e2.conversao},
+    // Ticket Médio só entra na comparação quando os 2 meses tiverem um valor GRAVADO de verdade
+    // (ver fechColetarDados) — o filtro abaixo (base!=null) já cuida de excluir automaticamente
+    // quando não tiver histórico real pros 2 meses.
+    {chave:'tk',label:'Ticket Médio',base:e1.tk,atual:e2.tk}
+  ].filter(c=>c.base!=null&&c.base>0&&c.atual!=null)
+   .map(c=>({...c,variacao:(c.atual-c.base)/c.base}));
+  if(!candidatos.length)return {melhor:null,atencao:null};
+  const melhor=candidatos.slice().sort((x,y)=>y.variacao-x.variacao)[0];
+  const atencao=candidatos.slice().sort((x,y)=>x.variacao-y.variacao)[0];
+  return {melhor,atencao};
+}
+// Sequência de meses consecutivos (incluindo o mês de fechamento) batendo a meta de vendas --
+// usado pra dar contexto narrativo tipo "pelo segundo mês consecutivo" nos insights.
+function fechStreakMeta(unidade,mesFechado,campo){
+  // campo: 'vendas' ou 'faturamento'
+  const meses=Object.keys(D.fat_data||{}).filter(m=>m<=mesFechado).sort();
+  let streak=0;
+  for(let i=meses.length-1;i>=0;i--){
+    const rec=(D.fat_data[meses[i]]||{})[unidade];
+    if(!rec)break;
+    if(campo==='vendas'){
+      const mv=rec.mv||0; if(mv<=0)break;
+      const v=(D.vendas_monthly&&D.vendas_monthly[unidade])?D.vendas_monthly[unidade][meses[i]]:null;
+      const real=v!=null?v:(rec.rv||0);
+      if(real/mv>=1)streak++; else break;
+    } else {
+      const fm=rec.fm||0; if(fm<=0)break;
+      if((rec.tend||0)/fm>=1)streak++; else break;
+    }
+  }
+  return streak;
+}
+function fechGerarInsights(d){
+  const ins=[];
+  const {a,aRede,mv,evolucao}=d;
+  const mesNome=fechNomeMes(d.mesFechado,true);
+  // 1) Vendas -- resultado + streak
+  if(mv>0){
+    const pctV=a.vReal/mv;
+    const streakV=fechStreakMeta(d.unidade,d.mesFechado,'vendas');
+    let txt='A unidade encerrou '+mesNome+' com '+(pctV*100).toFixed(1)+'% da meta de vendas';
+    if(streakV>=2)txt+=', mantendo o resultado positivo pelo '+streakV+'º mês consecutivo.';
+    else if(pctV>=1)txt+='.';
+    else txt+=', abaixo do esperado para o período.';
+    ins.push({tipo:pctV>=1?'positivo':(pctV>=0.8?'atencao':'risco'),texto:txt});
+  }
+  // 2) Faturamento -- atingimento + comparação com a rede
+  if(a.fm>0){
+    const atingPct=a.ating;
+    if(atingPct>=1)ins.push({tipo:'positivo',texto:'Faturamento de '+mesNome+' fechou em '+(atingPct*100).toFixed(1)+'% da meta ('+fatBR(Math.abs(a.gap))+' acima do previsto).'});
+    else if(atingPct>=0.9)ins.push({tipo:'atencao',texto:'Faturamento ficou próximo da meta em '+mesNome+': '+(atingPct*100).toFixed(1)+'% -- faltaram '+fatBR(Math.abs(a.gap))+'.'});
+    else ins.push({tipo:'risco',texto:'Faturamento abaixo da meta em '+mesNome+': '+(atingPct*100).toFixed(1)+'% de atingimento -- GAP de '+fatBR(Math.abs(a.gap))+' a recuperar.'});
+    if(aRede.ating>0){
+      const diffPP=(atingPct-aRede.ating)*100;
+      if(Math.abs(diffPP)>=0.5)ins.push({tipo:diffPP>=0?'positivo':'atencao',texto:'Isso é '+Math.abs(diffPP).toFixed(1)+' p.p. '+(diffPP>=0?'acima':'abaixo')+' da média da rede ('+(aRede.ating*100).toFixed(1)+'%).'});
+    }
+  }
+  // 3) Correlação ticket médio x vendas x faturamento (a que ela pediu explicitamente no exemplo)
+  const tendVendas=fechClassificarTendencia(evolucao[1].vReal>0?(evolucao[2].vReal-evolucao[1].vReal)/evolucao[1].vReal:null);
+  if(a.tk!=null&&aRede.tk){
+    const diffTk=(a.tk-aRede.tk)/aRede.tk;
+    if(tendVendas==='crescimento'&&diffTk<-0.03){
+      ins.push({tipo:'atencao',texto:'Apesar do aumento no número de vendas, o ticket médio ficou '+Math.abs(diffTk*100).toFixed(1)+'% abaixo da média da rede, o que pode estar limitando o crescimento do faturamento.'});
+    } else if(Math.abs(diffTk)>=0.01){
+      ins.push({tipo:diffTk>=0?'positivo':'atencao',texto:'Ticket médio de '+fatBR(a.tk)+' está '+Math.abs(diffTk*100).toFixed(1)+'% '+(diffTk>=0?'acima':'abaixo')+' da média da rede ('+fatBR(aRede.tk)+').'});
+    }
+  }
+  // 4) Conversão vs rede
+  if(a.conversao!=null&&aRede.conversao){
+    const diffC=(a.conversao-aRede.conversao)*100;
+    if(Math.abs(diffC)>=0.3)ins.push({tipo:diffC>=0?'positivo':'risco',texto:'A conversão da unidade está '+Math.abs(diffC).toFixed(1)+' p.p. '+(diffC>=0?'acima':'abaixo')+' da rede, indicando '+(diffC>=0?'bom':'fraco')+' aproveitamento das oportunidades comerciais.'});
+  }
+  // 5) Tendência recente (variação mês a mês)
+  const {melhor,atencao}=fechRankearIndicadores(d);
+  if(melhor&&melhor.variacao>0.02)ins.push({tipo:'positivo',texto:melhor.label+' foi o melhor resultado do período, com crescimento de '+(melhor.variacao*100).toFixed(1)+'% em relação ao mês anterior.'});
+  if(atencao&&atencao.variacao<-0.02)ins.push({tipo:'risco',texto:atencao.label+' é o indicador que mais exige atenção agora, com queda de '+Math.abs(atencao.variacao*100).toFixed(1)+'% em relação ao mês anterior.'});
+  if(a.inadPct!=null&&a.inadPct>0.05)ins.push({tipo:'risco',texto:'Inadimplência de '+(a.inadPct*100).toFixed(1)+'% da meta ('+fatBR(a.inad)+') -- vale acompanhar de perto.'});
+  if(!ins.length)ins.push({tipo:'atencao',texto:'Dados insuficientes para gerar insights -- confira se a Meta, Base de Clientes e Assinaturas deste mês já foram carregadas para esta unidade.'});
+  return ins.slice(0,5);
+}
+function fechGerarPrioridades(d){
+  const {a,aRede}=d;
+  const prior=[];
+  if(a.fm>0&&a.ating<1)prior.push('recuperar o GAP de faturamento');
+  if(a.tk!=null&&aRede.tk&&(a.tk-aRede.tk)/aRede.tk<-0.03)prior.push('elevar o ticket médio');
+  if(a.conversao!=null&&aRede.conversao&&(a.conversao-aRede.conversao)<-0.003)prior.push('melhorar a conversão de leads');
+  if(d.mv>0&&a.vReal/d.mv<1)prior.push('manter o ritmo de vendas novas');
+  if(!prior.length)prior.push('sustentar o ritmo atual de resultados');
+  return prior.slice(0,2).join(' e ');
+}
+// ── Slugs pra nome de arquivo ───────────────────────────────────────────
+function fechSlugUnidade(u){
+  const nucleo=(typeof nucleoUnidadeCurta==='function'?nucleoUnidadeCurta(dispName(u)):dispName(u))||dispName(u);
+  return String(nucleo).normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-zA-Z0-9]+/g,'_').replace(/^_+|_+$/g,'');
+}
+function fechSlugMes(mk){ return fechNomeMes(mk,false)+'_'+mk.split('-')[0]; }
+// ── Assunto do e-mail ───────────────────────────────────────────────────
+function fechAssunto(d){
+  return 'Fechamento de '+fechNomeMes(d.mesFechado,true)+' e metas de '+fechNomeMes(d.mesAtualK,true)+' | '+dispName(d.unidade);
+}
+// ── Renderização ON-SCREEN (dashboard) -- pode usar flex/grid livremente,
+// isso nunca é copiado pro e-mail em si (só o #fech-preview, que é montado por
+// fechRenderCorpoEmail, é usado pra copiar/baixar). ──────────────────────────
+function fechTileHtml(lbl,val,badge,sub){
+  return `<div style="background:#F5F5F7;border:1px solid #E2E6F0;border-radius:8px;padding:10px 12px;min-width:140px;flex:1 1 0">
+    <div style="font-size:10px;font-weight:800;color:#8A96B0;text-transform:uppercase">${lbl}</div>
+    <div style="font-weight:900;font-size:16px;margin-top:2px;color:var(--navy)">${val}</div>
+    ${badge?`<span style="display:inline-block;margin-top:4px;background:${badge.bg};color:${badge.fg};padding:2px 8px;border-radius:20px;font-weight:700;font-size:11px">${badge.txt}</span>`:''}
+    ${sub?`<div style="font-size:10px;color:var(--gray);margin-top:3px">${sub}</div>`:''}
+  </div>`;
+}
+function fechRenderKpiVendas(d){
+  const el=document.getElementById('fech-kpi-vendas'); if(!el)return;
+  const {a,mv,mvAtual}=d;
+  const pct=mv>0?a.vReal/mv:null;
+  const diff=mv>0?a.vReal-mv:null;
+  const cor=fechCorAtingimento(pct);
+  el.innerHTML=`<div style="display:flex;gap:10px;flex-wrap:wrap">
+    ${fechTileHtml('Meta de Vendas (mês anterior)', mv>0?mv:FECH_SEM_DADO)}
+    ${fechTileHtml('Vendas Realizadas', a.vReal!=null?a.vReal:FECH_SEM_DADO)}
+    ${fechTileHtml('% Atingimento', pct!=null?fechPct(pct):FECH_SEM_DADO, pct!=null?{bg:cor.bg,fg:cor.fg,txt:fechPct(pct)}:null)}
+    ${fechTileHtml('Diferença Absoluta', diff!=null?((diff>=0?'+':'')+diff):FECH_SEM_DADO)}
+    ${fechTileHtml('Meta de Vendas (mês atual)', mvAtual>0?mvAtual:FECH_SEM_DADO)}
+  </div>`;
+}
+function fechRenderKpiFat(d){
+  const el=document.getElementById('fech-kpi-fat'); if(!el)return;
+  const {a,fmAtual}=d;
+  const pct=a.fm>0?a.ating:null;
+  const cor=fechCorAtingimento(pct);
+  el.innerHTML=`<div style="display:flex;gap:10px;flex-wrap:wrap">
+    ${fechTileHtml('Meta de Faturamento (mês anterior)', a.fm>0?fatBR(a.fm):FECH_SEM_DADO)}
+    ${fechTileHtml('Faturamento Realizado', fatBR(a.tend))}
+    ${fechTileHtml('% Atingimento', pct!=null?fechPct(pct):FECH_SEM_DADO, pct!=null?{bg:cor.bg,fg:cor.fg,txt:fechPct(pct)}:null)}
+    ${fechTileHtml('GAP (R$)', a.fm>0?fatBR(a.gap):FECH_SEM_DADO)}
+    ${fechTileHtml('Meta de Faturamento (mês atual)', fmAtual>0?fatBR(fmAtual):FECH_SEM_DADO)}
+  </div>`;
+}
+function fechRenderKpiComercial(d){
+  const el=document.getElementById('fech-kpi-comercial'); if(!el)return;
+  const {a,aRede}=d;
+  const diffTk=(a.tk!=null&&aRede.tk)?(a.tk-aRede.tk)/aRede.tk:null;
+  const diffConv=(a.conversao!=null&&aRede.conversao)?(a.conversao-aRede.conversao):null;
+  const corTk=fechCorDelta(diffTk,0.01);
+  const corConv=fechCorDelta(diffConv,0.003);
+  el.innerHTML=`<div style="display:flex;gap:10px;flex-wrap:wrap">
+    ${fechTileHtml('Ticket Médio da Unidade', a.tk!=null?fatBR(a.tk):FECH_SEM_DADO)}
+    ${fechTileHtml('Conversão da Unidade', a.conversao!=null?fechPct(a.conversao):FECH_SEM_DADO)}
+    ${fechTileHtml('Ticket Médio da Rede', aRede.tk!=null?fatBR(aRede.tk):FECH_SEM_DADO)}
+    ${fechTileHtml('Conversão da Rede', aRede.conversao!=null?fechPct(aRede.conversao):FECH_SEM_DADO)}
+    ${fechTileHtml('Diferença vs. Rede',
+        (diffTk!=null?'Ticket: '+(diffTk>=0?'+':'')+(diffTk*100).toFixed(1)+'%':FECH_SEM_DADO)
+        +'<br>'+(diffConv!=null?'Conversão: '+(diffConv>=0?'+':'')+(diffConv*100).toFixed(1)+' p.p.':''),
+        null)}
+  </div>`;
+}
+let _fechChart=null;
+function fechRenderEvolucaoChart(d){
+  const canvas=document.getElementById('fech-chart-evolucao'); if(!canvas||typeof Chart==='undefined')return;
+  const labels=d.evolucao.map(e=>fechNomeMes(e.mk,false).slice(0,3)+'/'+e.mk.split('-')[0].slice(2));
+  if(_fechChart){ try{_fechChart.destroy();}catch(e){} }
+  try{
+    _fechChart=new Chart(canvas.getContext('2d'),{
+      type:'line',
+      data:{labels,datasets:[
+        {label:'Faturamento Realizado',data:d.evolucao.map(e=>e.tend),borderColor:'#053CD8',backgroundColor:'rgba(5,60,216,.1)',yAxisID:'y',tension:.3},
+        {label:'Vendas Realizadas',data:d.evolucao.map(e=>e.vReal),borderColor:'#0a7a00',backgroundColor:'rgba(10,122,0,.1)',yAxisID:'y1',tension:.3}
+      ]},
+      options:{responsive:true,animation:false,interaction:{mode:'index',intersect:false},
+        scales:{y:{position:'left',title:{display:true,text:'Faturamento (R$)'}},y1:{position:'right',title:{display:true,text:'Vendas'},grid:{drawOnChartArea:false}}}}
+    });
+  }catch(e){ console.warn('chart fechamento:',e); }
+}
+function fechRenderEvolucaoTabela(d){
+  const el=document.getElementById('fech-evolucao-tabela'); if(!el)return;
+  const linha=e=>`<tr>
+    <td class="fw">${FAT_MESES_NOME[e.mk]||e.mk}</td>
+    <td class="tr">${e.vReal!=null?e.vReal:FECH_SEM_DADO}</td>
+    <td class="tr">${fechPct(e.atingVendas)}</td>
+    <td class="tr">${fatBR(e.tend)}</td>
+    <td class="tr">${fechPct(e.atingFat)}</td>
+    <td class="tr">${e.tk!=null?fatBR(e.tk):FECH_SEM_DADO}</td>
+    <td class="tr">${fechPct(e.conversao)}</td>
+  </tr>`;
+  el.innerHTML=`<div style="overflow-x:auto"><table class="tbl"><thead><tr>
+    <th>Mês</th><th>Vendas</th><th>% Meta Vendas</th><th>Faturamento</th><th>% Meta Fat.</th><th>Ticket Médio</th><th>Conversão</th>
+  </tr></thead><tbody>${d.evolucao.map(linha).join('')}</tbody></table></div>`;
+}
+function fechRenderEvolucaoResumo(d){
+  const el=document.getElementById('fech-evolucao-resumo'); if(!el)return;
+  const {melhor,atencao}=fechRankearIndicadores(d);
+  const tendVendas=fechClassificarTendencia(d.evolucao[1].vReal>0?(d.evolucao[2].vReal-d.evolucao[1].vReal)/d.evolucao[1].vReal:null);
+  const tendFat=fechClassificarTendencia(d.evolucao[1].tend>0?(d.evolucao[2].tend-d.evolucao[1].tend)/d.evolucao[1].tend:null);
+  el.innerHTML=`<div style="display:flex;gap:10px;flex-wrap:wrap;font-size:12px">
+    <div style="background:#EEF3FF;border-radius:8px;padding:8px 12px">Tendência de Vendas: <strong>${tendVendas||FECH_SEM_DADO}</strong></div>
+    <div style="background:#EEF3FF;border-radius:8px;padding:8px 12px">Tendência de Faturamento: <strong>${tendFat||FECH_SEM_DADO}</strong></div>
+    <div style="background:#F0FBF0;border-radius:8px;padding:8px 12px">Melhor resultado do período: <strong>${melhor?melhor.label:FECH_SEM_DADO}</strong></div>
+    <div style="background:#FFF8EC;border-radius:8px;padding:8px 12px">Exige mais atenção: <strong>${atencao?atencao.label:FECH_SEM_DADO}</strong></div>
+  </div>`;
+}
+function fechRenderInsightsList(d){
+  const el=document.getElementById('fech-insights-lista'); if(!el)return;
+  const corIns={positivo:{bg:'#F0FBF0',fg:'#0a7a00'},atencao:{bg:'#FFF8EC',fg:'#b37000'},risco:{bg:'#FDEEEE',fg:'#E53935'}};
+  const insights=fechGerarInsights(d);
+  el.innerHTML=insights.map(i=>`<div style="background:${corIns[i.tipo].bg};border-left:4px solid ${corIns[i.tipo].fg};border-radius:6px;padding:8px 12px;margin-bottom:6px;font-size:13px">${i.texto}</div>`).join('');
+}
+function fechRenderMetasAtual(d){
+  const el=document.getElementById('fech-metas-atual'); if(!el)return;
+  el.innerHTML=`<div style="display:flex;gap:10px;flex-wrap:wrap">
+    ${fechTileHtml('Meta de Vendas', d.mvAtual>0?d.mvAtual:FECH_SEM_DADO)}
+    ${fechTileHtml('Meta de Faturamento', d.fmAtual>0?fatBR(d.fmAtual):FECH_SEM_DADO)}
+    ${fechTileHtml('Vendas/Dia (média)', d.vendasPorDia!=null?d.vendasPorDia.toFixed(1):FECH_SEM_DADO,null,d.dusAtualMes+' dias úteis no mês')}
+    ${fechTileHtml('Faturamento/Dia (média)', d.fatPorDia!=null?fatBR(d.fatPorDia):FECH_SEM_DADO)}
+  </div>`;
+}
+// ── CORPO DO E-MAIL (só <table> + estilo inline -- compatível com Outlook) ──
+function fechBadgeInline(txt,cor){
+  return `<span style="display:inline-block;padding:3px 10px;border-radius:20px;font-weight:bold;font-size:12px;background:${cor.bg};color:${cor.fg}">${txt}</span>`;
+}
+function fechCardEmail(titulo,valor,badgeHtml,subTxt){
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#F5F5F7;border:1px solid #E2E6F0"><tr><td style="padding:12px">
+    <div style="font-size:10px;font-weight:800;color:#8A96B0;text-transform:uppercase">${titulo}</div>
+    <div style="font-size:18px;font-weight:900;color:#022D8A;margin-top:4px">${valor}</div>
+    ${badgeHtml?`<div style="margin-top:4px">${badgeHtml}</div>`:''}
+    ${subTxt?`<div style="font-size:11px;color:#5A5F73;margin-top:6px">${subTxt}</div>`:''}
+  </td></tr></table>`;
+}
+// Captura o gráfico de evolução (canvas do Chart.js, já desenhado no painel ao vivo pela
+// fechRenderEvolucaoChart, que sempre roda antes desta função dentro de renderFechamento) como
+// uma imagem PNG em base64 -- é assim que dá pra "trazer o gráfico" pro HTML do e-mail: e-mail
+// não roda JavaScript nem Chart.js, então o gráfico interativo (canvas) não funciona dentro do
+// Gmail/Outlook. A saída é uma imagem estática (<img src="data:image/png;base64,...">), que sim
+// é compatível com os principais clientes de e-mail -- diferente de canvas/SVG/JS ao vivo.
+function fechCapturarGraficoEvolucao(){
+  try{
+    // Confere _fechChart (não só o canvas) -- um canvas com width/height "default" do HTML mas
+    // sem o Chart.js ter desenhado nele (ex.: biblioteca falhou ao carregar) geraria uma imagem
+    // em branco silenciosa em vez de simplesmente não mostrar o gráfico.
+    if(!_fechChart)return null;
+    const canvas=document.getElementById('fech-chart-evolucao');
+    if(!canvas||!canvas.width||!canvas.height)return null;
+    return canvas.toDataURL('image/png');
+  }catch(e){ console.warn('captura gráfico fechamento:',e); return null; }
+}
+function fechRenderCorpoEmail(d){
+  const {a,aRede,mv,mvAtual,fmAtual,evolucao,mesFechado,mesAtualK,info,contato}=d;
+  const nomeUnidade=dispName(d.unidade);
+  const nomeFranqueado=(contato&&contato.nome)?contato.nome:'Franqueado(a)';
+  const mesFechadoNome=fechNomeMes(mesFechado,true);
+  const mesAtualNome=fechNomeMes(mesAtualK,true);
+  const insights=fechGerarInsights(d);
+  const prioridades=fechGerarPrioridades(d);
+  const corIns={positivo:{bg:'#F0FBF0',fg:'#0a7a00'},atencao:{bg:'#FFF8EC',fg:'#b37000'},risco:{bg:'#FDEEEE',fg:'#E53935'}};
+
+  const pctVendas=mv>0?a.vReal/mv:null;
+  const diffVendas=mv>0?a.vReal-mv:null;
+  const corVendas=fechCorAtingimento(pctVendas);
+  const cardVendas=fechCardEmail('Vendas de '+MESES_PT_NOMES[+mesFechado.split('-')[1]-1],
+    (a.vReal!=null?a.vReal:FECH_SEM_DADO)+' / '+(mv>0?mv:FECH_SEM_DADO),
+    pctVendas!=null?fechBadgeInline(fechPct(pctVendas),corVendas):'',
+    'Diferença: '+(diffVendas!=null?((diffVendas>=0?'+':'')+diffVendas):FECH_SEM_DADO)+'<br>Meta '+mesAtualNome+': '+(mvAtual>0?mvAtual:FECH_SEM_DADO));
+
+  const pctFat=a.fm>0?a.ating:null;
+  const corFat=fechCorAtingimento(pctFat);
+  const cardFat=fechCardEmail('Faturamento de '+MESES_PT_NOMES[+mesFechado.split('-')[1]-1],
+    fatBR(a.tend)+' / '+(a.fm>0?fatBR(a.fm):FECH_SEM_DADO),
+    pctFat!=null?fechBadgeInline(fechPct(pctFat),corFat):'',
+    'GAP: '+(a.fm>0?fatBR(a.gap):FECH_SEM_DADO)+'<br>Meta '+mesAtualNome+': '+(fmAtual>0?fatBR(fmAtual):FECH_SEM_DADO));
+
+  const linhaComp=(lbl,vU,vR)=>`<tr>
+    <td style="padding:8px 10px;border-bottom:1px solid #E2E6F0;font-size:12px">${lbl}</td>
+    <td style="padding:8px 10px;border-bottom:1px solid #E2E6F0;font-size:12px;text-align:right;font-weight:700;color:#022D8A">${vU}</td>
+    <td style="padding:8px 10px;border-bottom:1px solid #E2E6F0;font-size:12px;text-align:right;color:#1a2340">${vR}</td>
+  </tr>`;
+  const tabelaComparativo=`<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse">
+    <tr style="background:#EEF3FF"><td style="padding:8px 10px;font-size:10px;font-weight:800;color:#8A96B0;text-transform:uppercase">Indicador</td>
+    <td style="padding:8px 10px;font-size:10px;font-weight:800;color:#8A96B0;text-transform:uppercase;text-align:right">Unidade</td>
+    <td style="padding:8px 10px;font-size:10px;font-weight:800;color:#8A96B0;text-transform:uppercase;text-align:right">Rede</td></tr>
+    ${linhaComp('Ticket Médio', a.tk!=null?fatBR(a.tk):FECH_SEM_DADO, aRede.tk!=null?fatBR(aRede.tk):FECH_SEM_DADO)}
+    ${linhaComp('Conversão', fechPct(a.conversao), fechPct(aRede.conversao))}
+  </table>`;
+
+  const linhaEvo=e=>`<tr>
+    <td style="padding:6px 8px;border-bottom:1px solid #E2E6F0;font-size:11px">${FAT_MESES_NOME[e.mk]||e.mk}</td>
+    <td style="padding:6px 8px;border-bottom:1px solid #E2E6F0;font-size:11px;text-align:right">${e.vReal!=null?e.vReal:FECH_SEM_DADO}</td>
+    <td style="padding:6px 8px;border-bottom:1px solid #E2E6F0;font-size:11px;text-align:right">${fechPct(e.atingVendas)}</td>
+    <td style="padding:6px 8px;border-bottom:1px solid #E2E6F0;font-size:11px;text-align:right;font-weight:700;color:#022D8A">${fatBR(e.tend)}</td>
+    <td style="padding:6px 8px;border-bottom:1px solid #E2E6F0;font-size:11px;text-align:right">${fechPct(e.atingFat)}</td>
+    <td style="padding:6px 8px;border-bottom:1px solid #E2E6F0;font-size:11px;text-align:right">${fechPct(e.conversao)}</td>
+  </tr>`;
+  const tabelaEvolucao=`<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse">
+    <tr style="background:#EEF3FF">
+      <td style="padding:6px 8px;font-size:10px;font-weight:800;color:#8A96B0;text-transform:uppercase">Mês</td>
+      <td style="padding:6px 8px;font-size:10px;font-weight:800;color:#8A96B0;text-transform:uppercase;text-align:right">Vendas</td>
+      <td style="padding:6px 8px;font-size:10px;font-weight:800;color:#8A96B0;text-transform:uppercase;text-align:right">% Meta</td>
+      <td style="padding:6px 8px;font-size:10px;font-weight:800;color:#8A96B0;text-transform:uppercase;text-align:right">Faturamento</td>
+      <td style="padding:6px 8px;font-size:10px;font-weight:800;color:#8A96B0;text-transform:uppercase;text-align:right">% Meta</td>
+      <td style="padding:6px 8px;font-size:10px;font-weight:800;color:#8A96B0;text-transform:uppercase;text-align:right">Conversão</td>
+    </tr>
+    ${evolucao.map(linhaEvo).join('')}
+  </table>`;
+  const graficoDataUrl=fechCapturarGraficoEvolucao();
+  const graficoHtml=graficoDataUrl?`<img src="${graficoDataUrl}" alt="Gráfico de evolução -- Faturamento e Vendas dos últimos 3 meses" width="592" style="width:100%;max-width:592px;height:auto;display:block;margin:0 auto 10px;border:1px solid #E2E6F0;border-radius:6px" />`:'';
+  const {melhor,atencao}=fechRankearIndicadores(d);
+  const tendVendasTxt=fechClassificarTendencia(evolucao[1].vReal>0?(evolucao[2].vReal-evolucao[1].vReal)/evolucao[1].vReal:null);
+  const tendFatTxt=fechClassificarTendencia(evolucao[1].tend>0?(evolucao[2].tend-evolucao[1].tend)/evolucao[1].tend:null);
+  const resumoEvolucao='Vendas em '+(tendVendasTxt||FECH_SEM_DADO)+' e faturamento em '+(tendFatTxt||FECH_SEM_DADO)+' nos últimos 3 meses. '
+    +'Melhor resultado do período: '+(melhor?melhor.label:FECH_SEM_DADO)+'. Ponto de maior atenção: '+(atencao?atencao.label:FECH_SEM_DADO)+'.';
+
+  const insightsHtml=insights.map(i=>`<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:6px"><tr>
+    <td width="4" style="background:${corIns[i.tipo].fg};font-size:1px;line-height:1px">&nbsp;</td>
+    <td style="background:${corIns[i.tipo].bg};padding:8px 12px;font-size:13px">${i.texto}</td>
+  </tr></table>`).join('');
+
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:640px;margin:0 auto;font-family:Arial,Helvetica,sans-serif;color:#1a2340;background:#ffffff">
+  <tr><td style="background:#022D8A;padding:24px;color:#ffffff">
+    <div style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;font-weight:bold;opacity:.85">Fast Tennis &middot; Gestão de Resultados</div>
+    <div style="font-size:22px;font-weight:900;margin-top:6px">Fechamento de ${MESES_PT_NOMES[+mesFechado.split('-')[1]-1]} | Metas de ${MESES_PT_NOMES[+mesAtualK.split('-')[1]-1]}</div>
+    <div style="font-size:14px;margin-top:4px;opacity:.9">${nomeUnidade}</div>
+  </td></tr>
+  <tr><td style="padding:20px 24px 4px;font-size:14px;line-height:1.6">
+    Olá, ${nomeFranqueado}. Tudo bem?<br><br>
+    Compartilho abaixo o fechamento da unidade referente a ${mesFechadoNome}, além das principais metas e prioridades para ${mesAtualNome}.
+  </td></tr>
+  <tr><td style="padding:16px 24px 4px">
+    <div style="font-size:15px;font-weight:800;color:#022D8A;margin-bottom:8px">Fechamento de ${mesFechadoNome}</div>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+      <td width="50%" style="padding-right:6px" valign="top">${cardVendas}</td>
+      <td width="50%" style="padding-left:6px" valign="top">${cardFat}</td>
+    </tr></table>
+  </td></tr>
+  <tr><td style="padding:12px 24px 4px">
+    <div style="font-size:15px;font-weight:800;color:#022D8A;margin-bottom:8px">Comparativo com a Rede</div>
+    ${tabelaComparativo}
+  </td></tr>
+  <tr><td style="padding:16px 24px 4px">
+    <div style="font-size:15px;font-weight:800;color:#022D8A;margin-bottom:8px">Evolução dos Últimos 3 Meses</div>
+    ${graficoHtml}
+    ${tabelaEvolucao}
+    <div style="font-size:13px;color:#5A5F73;margin-top:8px;line-height:1.5">${resumoEvolucao}</div>
+  </td></tr>
+  <tr><td style="padding:16px 24px 4px">
+    <div style="font-size:15px;font-weight:800;color:#022D8A;margin-bottom:8px">Principais Insights</div>
+    ${insightsHtml}
+  </td></tr>
+  <tr><td style="padding:16px 24px">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#022D8A"><tr><td style="padding:16px;color:#ffffff">
+      <div style="font-size:13px;font-weight:800;text-transform:uppercase;opacity:.85">Metas de ${mesAtualNome}</div>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:8px"><tr>
+        <td width="50%" style="padding-right:24px"><div style="font-size:11px;opacity:.8">Meta de Vendas</div><div style="font-size:18px;font-weight:900">${mvAtual>0?mvAtual:FECH_SEM_DADO}</div></td>
+        <td width="50%"><div style="font-size:11px;opacity:.8">Meta de Faturamento</div><div style="font-size:18px;font-weight:900">${fmAtual>0?fatBR(fmAtual):FECH_SEM_DADO}</div></td>
+      </tr></table>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:10px"><tr>
+        <td width="50%" style="padding-right:24px"><div style="font-size:11px;opacity:.8">Vendas/Dia (média)</div><div style="font-size:15px;font-weight:800">${d.vendasPorDia!=null?d.vendasPorDia.toFixed(1):FECH_SEM_DADO}</div></td>
+        <td width="50%"><div style="font-size:11px;opacity:.8">Faturamento/Dia (média)</div><div style="font-size:15px;font-weight:800">${d.fatPorDia!=null?fatBR(d.fatPorDia):FECH_SEM_DADO}</div></td>
+      </tr></table>
+    </td></tr></table>
+    <div style="font-size:13px;color:#1a2340;margin-top:12px;line-height:1.5">Para este mês, os principais focos serão: ${prioridades}.</div>
+  </td></tr>
+  <tr><td style="padding:16px 24px 24px;font-size:13px;line-height:1.7">
+    Conte com o nosso apoio para a construção dos planos de ação e acompanhamento dos resultados.<br><br>
+    Atenciosamente,<br>Gestão de Resultados | Fast Tennis
+  </td></tr>
+  <tr><td style="padding:12px 24px;font-size:10px;color:#8A96B0;text-align:center;border-top:1px solid #E2E6F0">Gerado automaticamente pelo Dashboard Fast Tennis &middot; Gestão de Resultados</td></tr>
+</table>`;
+}
+function fechRenderTextoPlano(d){
+  const {a,aRede,mv,mvAtual,fmAtual,mesFechado,mesAtualK,contato}=d;
+  const insights=fechGerarInsights(d);
+  const nomeFranqueado=(contato&&contato.nome)?contato.nome:'Franqueado(a)';
+  let t='Assunto: '+fechAssunto(d)+'\n\n';
+  t+='Olá, '+nomeFranqueado+'. Tudo bem?\n';
+  t+='Compartilho abaixo o fechamento da unidade referente a '+fechNomeMes(mesFechado,true)+', além das principais metas e prioridades para '+fechNomeMes(mesAtualK,true)+'.\n\n';
+  t+='FECHAMENTO DE '+fechNomeMes(mesFechado,true).toUpperCase()+'\n';
+  t+='- Vendas: '+(a.vReal!=null?a.vReal:FECH_SEM_DADO)+' de '+(mv>0?mv:FECH_SEM_DADO)+' -- '+fechPct(mv>0?a.vReal/mv:null)+' da meta\n';
+  t+='- Faturamento: '+fatBR(a.tend)+' de '+(a.fm>0?fatBR(a.fm):FECH_SEM_DADO)+' -- '+fechPct(a.fm>0?a.ating:null)+' da meta\n';
+  t+='- Ticket médio: '+(a.tk!=null?fatBR(a.tk):FECH_SEM_DADO)+'\n';
+  t+='- Conversão: '+fechPct(a.conversao)+'\n\n';
+  t+='COMPARATIVO COM A REDE\n';
+  t+='- Ticket médio da unidade: '+(a.tk!=null?fatBR(a.tk):FECH_SEM_DADO)+' / rede: '+(aRede.tk!=null?fatBR(aRede.tk):FECH_SEM_DADO)+'\n';
+  t+='- Conversão da unidade: '+fechPct(a.conversao)+' / rede: '+fechPct(aRede.conversao)+'\n\n';
+  t+='PRINCIPAIS INSIGHTS\n'+insights.map(i=>'- '+i.texto).join('\n')+'\n\n';
+  t+='METAS DE '+fechNomeMes(mesAtualK,true).toUpperCase()+'\n';
+  t+='- Meta de vendas: '+(mvAtual>0?mvAtual:FECH_SEM_DADO)+'\n';
+  t+='- Meta de faturamento: '+(fmAtual>0?fatBR(fmAtual):FECH_SEM_DADO)+'\n';
+  t+='- Vendas/dia (média): '+(d.vendasPorDia!=null?d.vendasPorDia.toFixed(1):FECH_SEM_DADO)+'\n';
+  t+='- Faturamento/dia (média): '+(d.fatPorDia!=null?fatBR(d.fatPorDia):FECH_SEM_DADO)+'\n\n';
+  t+='Para este mês, os principais focos serão: '+fechGerarPrioridades(d)+'.\n\n';
+  t+='Conte com o nosso apoio para a construção dos planos de ação e acompanhamento dos resultados.\n\n';
+  t+='Atenciosamente,\nGestão de Resultados | Fast Tennis\n';
+  return t;
+}
+function fechGerarDocCompleto(corpoHtml,tituloDoc){
+  return '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'+tituloDoc+'</title></head>'
+    +'<body style="margin:0;padding:16px;background:#ffffff">'+corpoHtml+'</body></html>';
+}
+// ── Ações (copiar / baixar / assunto / destinatários) ──────────────────────
+function fechToggleAcoes(){
+  const body=document.getElementById('fech-acoes-body'), ic=document.getElementById('fech-acoes-toggle-ic');
+  if(!body)return;
+  const abrir=body.style.display==='none';
+  body.style.display=abrir?'':'none';
+  if(ic)ic.innerHTML=abrir?'▾':'▸';
+}
+function fechDadosAtuais(){
+  const g=id=>document.getElementById(id);
+  const uSel=g('fech-unidade'), mSel=g('fech-mes'), maSel=g('fech-mes-atual');
+  if(!uSel||!uSel.value||!mSel||!mSel.value||!maSel||!maSel.value){
+    alert('Selecione a unidade, o mês de fechamento e o mês da meta atual primeiro.');
+    return null;
+  }
+  try{ return fechColetarDados(uSel.value,mSel.value,maSel.value); }
+  catch(e){ alert('Erro ao montar os dados: '+e.message); console.error('fechamento:',e); return null; }
+}
+async function fechCopiarEmail(){
+  const d=fechDadosAtuais(); if(!d)return;
+  const corpo=fechRenderCorpoEmail(d);
+  const texto=fechRenderTextoPlano(d);
+  try{
+    const item=new ClipboardItem({
+      'text/html':new Blob([corpo],{type:'text/html'}),
+      'text/plain':new Blob([texto],{type:'text/plain'})
+    });
+    await navigator.clipboard.write([item]);
+    alert('E-mail copiado! Agora é só colar (Ctrl+V) no corpo do e-mail no Gmail ou Outlook.');
+  }catch(e){
+    alert('Não consegui copiar automaticamente ('+e.message+').\nUse o botão "Baixar Arquivo HTML" -- abra o arquivo baixado no navegador e dê Ctrl+A e Ctrl+C lá dentro.');
+  }
+}
+function fechBaixarArquivo(){
+  const d=fechDadosAtuais(); if(!d)return;
+  const corpo=fechRenderCorpoEmail(d);
+  const tituloDoc='Fechamento '+fechNomeMes(d.mesFechado,false)+' - '+dispName(d.unidade);
+  const doc=fechGerarDocCompleto(corpo,tituloDoc);
+  const blob=new Blob([doc],{type:'text/html'});
+  const url=URL.createObjectURL(blob);
+  const aTag=document.createElement('a');
+  aTag.href=url;
+  aTag.download='Fechamento_'+fechSlugUnidade(d.unidade)+'_'+fechSlugMes(d.mesFechado)+'.html';
+  aTag.click();
+  setTimeout(()=>URL.revokeObjectURL(url),3000);
+}
+async function fechCopiarAssunto(){
+  const d=fechDadosAtuais(); if(!d)return;
+  const assunto=fechAssunto(d);
+  try{
+    await navigator.clipboard.writeText(assunto);
+    alert('Assunto copiado:\n'+assunto);
+  }catch(e){
+    prompt('Copie o assunto abaixo (Ctrl+C):',assunto);
+  }
+}
+async function fechCopiarDestinatarios(){
+  const uSel=document.getElementById('fech-unidade');
+  if(!uSel||!uSel.value){alert('Selecione a unidade primeiro.');return;}
+  const contato=fechContatoGet(uSel.value);
+  if(!contato||!contato.email){
+    alert(FECH_SEM_DADO+' -- nenhum e-mail de franqueado foi salvo para '+dispName(uSel.value)+' ainda. Preencha o campo "E-mail do Franqueado" acima e clique em "Salvar Contato".');
+    return;
+  }
+  try{
+    await navigator.clipboard.writeText(contato.email);
+    alert('E-mail do franqueado copiado: '+contato.email);
+  }catch(e){
+    prompt('Copie o e-mail abaixo (Ctrl+C):',contato.email);
+  }
+}
+// ── Orquestrador principal da aba ──────────────────────────────────────────
+function renderFechamento(){
+  const g=id=>document.getElementById(id);
+  if(!g('fech-unidade'))return;
+  fechFillSelects();
+  const gSel=g('fech-gestor');
+  if(gSel)fechPopularUnidades(gSel.value);
+  const unidade=g('fech-unidade').value, mesFechado=g('fech-mes').value, mesAtualK=g('fech-mes-atual').value;
+  if(g('fech-titulo-aba'))g('fech-titulo-aba').textContent='Fechamento';
+  if(!unidade||!mesFechado||!mesAtualK){
+    ['fech-kpi-vendas','fech-kpi-fat','fech-kpi-comercial','fech-evolucao-tabela','fech-evolucao-resumo','fech-insights-lista','fech-metas-atual'].forEach(id=>{ if(g(id))g(id).innerHTML=''; });
+    if(g('fech-preview'))g('fech-preview').innerHTML='<div style="padding:20px;color:var(--gray);text-align:center">Selecione a unidade, o mês de fechamento e o mês da meta atual.</div>';
+    return;
+  }
+  let d;
+  try{ d=fechColetarDados(unidade,mesFechado,mesAtualK); }
+  catch(e){
+    if(g('fech-preview'))g('fech-preview').innerHTML='<div style="padding:20px;color:red">Erro: '+e.message+'</div>';
+    console.error('fechamento:',e);
+    return;
+  }
+  if(g('fech-titulo-aba'))g('fech-titulo-aba').textContent='Fechamento de '+fechNomeMes(mesFechado,true)+' | Metas de '+fechNomeMes(mesAtualK,true);
+  if(g('fech-header'))g('fech-header').innerHTML=dispName(unidade)+' &middot; '+(D.unidades_info[unidade]&&D.unidades_info[unidade].gerente?'Gestor: '+D.unidades_info[unidade].gerente+' &middot; ':'')+'Fechamento de '+fechNomeMes(mesFechado,true)+' &rarr; Metas de '+fechNomeMes(mesAtualK,true);
+  // Pré-preenche os campos de contato com o que já estiver salvo pra essa unidade (sem
+  // sobrescrever o que ela estiver digitando -- só quando o campo ainda está vazio/trocou de unidade).
+  const nomeInp=g('fech-contato-nome'), emailInp=g('fech-contato-email');
+  if(nomeInp&&emailInp&&nomeInp.dataset.unidade!==unidade){
+    nomeInp.value=(d.contato&&d.contato.nome)||'';
+    emailInp.value=(d.contato&&d.contato.email)||'';
+    nomeInp.dataset.unidade=unidade;
+  }
+  try{ fechRenderKpiVendas(d); }catch(e){ console.error('fech kpi vendas:',e); }
+  try{ fechRenderKpiFat(d); }catch(e){ console.error('fech kpi fat:',e); }
+  try{ fechRenderKpiComercial(d); }catch(e){ console.error('fech kpi comercial:',e); }
+  try{ fechRenderEvolucaoChart(d); }catch(e){ console.error('fech chart:',e); }
+  try{ fechRenderEvolucaoTabela(d); }catch(e){ console.error('fech tabela evolucao:',e); }
+  try{ fechRenderEvolucaoResumo(d); }catch(e){ console.error('fech resumo evolucao:',e); }
+  try{ fechRenderInsightsList(d); }catch(e){ console.error('fech insights:',e); }
+  try{ fechRenderMetasAtual(d); }catch(e){ console.error('fech metas atual:',e); }
+  if(g('fech-preview')){
+    try{ g('fech-preview').innerHTML=fechRenderCorpoEmail(d); }
+    catch(e){ g('fech-preview').innerHTML='<div style="padding:20px;color:red">Erro ao montar prévia: '+e.message+'</div>'; console.error('fech preview:',e); }
+  }
 }
 
 // ── COMPARATIVO GERAL ──────────────────────────────────────────────
@@ -2108,6 +2979,7 @@ function renderActive(){
   if(TAB==='resumo'){try{renderResumo();}catch(e){console.error('resumo:',e);}}
   if(TAB==='raiox'){try{renderRaioX();}catch(e){console.error('raiox:',e);}}
   if(TAB==='comparativo'){try{renderComparativoGeral();}catch(e){console.error('comparativo:',e);}try{renderComparativoMulti();}catch(e){console.error('comparativo-multi:',e);}}
+  if(TAB==='fechamento'){try{renderFechamento();}catch(e){console.error('fechamento:',e);}}
 }
 
 // ── CONSOLIDADO
@@ -2247,6 +3119,14 @@ function renderC(){
   const pesoHojeC=pesoDia(hoje);
   const metaDuHojeC=metaPorDU*pesoHojeC;
 
+  // Churn e Adições Líquidas da rede (soma dos valores por unidade já calculados em buildData)
+  let churnAtivosC=0, churnChurnedC=0, addLiqC=0, temChurnC=false;
+  data.forEach(r=>{
+    if(r.churned==null)return;
+    temChurnC=true; churnChurnedC+=r.churned; churnAtivosC+=(r.churnAtivosIni||0); addLiqC+=(r.addLiq||0);
+  });
+  const churnPctC=temChurnC&&churnAtivosC>0?churnChurnedC/churnAtivosC:null;
+
   document.getElementById('kpi-c').innerHTML=`
     <div class="kpi k-blue"><div class="kpi-lbl">Meta Total</div><div class="kpi-val">${fN(totalM)}</div><div class="kpi-sub">${wmW} unid · ${mesLbl}</div></div>
     <div class="kpi k-green"><div class="kpi-lbl">Vendas Realizadas</div><div class="kpi-val">${fN(totalV)}</div><div class="kpi-sub">${mesLbl}</div></div>
@@ -2262,6 +3142,8 @@ function renderC(){
     <div class="kpi k-navy"><div class="kpi-lbl">Meta/DU</div><div class="kpi-val">${(Math.round(metaPorDU*10)/10).toLocaleString('pt-BR')}</div><div class="kpi-sub">média do período</div></div>
     <div class="kpi k-orange"><div class="kpi-lbl">Meta DU Hoje</div><div class="kpi-val">${(Math.round(metaDuHojeC*10)/10).toLocaleString('pt-BR')}</div><div class="kpi-sub">${pesoHojeC===0?'sem meta (dom./feriado)':pesoHojeC===0.5?'sábado (peso 0,5)':'dia útil'}</div></div>
     <div class="kpi k-red" style="cursor:pointer" onclick="mostrarListaVendas('zerado')"><div class="kpi-lbl">🚨 Venda Zerada D-1</div><div class="kpi-val" style="color:${zeradas.length>0?'#E53935':'#0a7a00'}">${zeradas.length}<span style="font-size:13px;color:var(--gray)"> / ${wmW}</span></div><div class="kpi-sub">${wmW?Math.round(zeradas.length/wmW*100):0}% · ${ultimoC.split('-').reverse().join('/')} · 👆 ver unidades</div></div>
+    <div class="kpi"><div class="kpi-lbl">Churn (%)</div><div class="kpi-val" style="color:${!temChurnC?'var(--gray)':churnPctC>0.08?'#E53935':'#0a7a00'}">${temChurnC?(churnPctC*100).toFixed(1)+'%':'—'}</div><div class="kpi-sub">${temChurnC?'meta da rede: 8%':'suba a base de clientes'}</div></div>
+    <div class="kpi ${temChurnC&&addLiqC>=0?'k-green':''}"><div class="kpi-lbl">Adições Líquidas</div><div class="kpi-val" style="color:${!temChurnC?'var(--gray)':addLiqC>=0?'#0a7a00':'#E53935'}">${temChurnC?(addLiqC>=0?'+':'')+fN(addLiqC):'—'}</div><div class="kpi-sub">vendas − churn${temChurnC?'':' · suba a base de clientes'}</div></div>
   `;
   const fk=FAIXA.c;
   document.getElementById('faixa-c').innerHTML=`
@@ -2278,7 +3160,8 @@ function renderC(){
   const buscaC=(document.getElementById('c-busca')?document.getElementById('c-busca').value:'').trim().toLowerCase();
   if(buscaC)disp=disp.filter(r=>r.name.toLowerCase().includes(buscaC)||(r.gerente||'').toLowerCase().includes(buscaC));
   if(SORT_C_DIR==='asc')disp=disp.slice().reverse();
-  const faixaTitulo=fk==='red'?'🚨 Unidades Críticas — Menor Atingimento':fk==='green'?'Ranking — Acima da Meta':fk==='yellow'?'Ranking — Atenção (80–99%)':'Ranking Completo';
+  const mesLblC=FAT_MESES_NOME[mKeyForCalc]||mesLbl;
+  const faixaTitulo=fk==='red'?'🚨 Unidades Críticas — Menor Atingimento':fk==='green'?'Ranking — Acima da Meta':fk==='yellow'?'Ranking — Atenção (80–99%)':`Vendas por Unidade · ${mesLblC}`;
   document.getElementById('lbl-c').textContent=`${faixaTitulo} · ${disp.length} unidades`;
   const shC=document.getElementById('c-sort-hint');
   if(shC)shC.textContent=SORT_C_DIR==='asc'?'↕️ ordenado por Menor Atingimento — Prioridade de Atuação':'↕️ ordenado por Maior Atingimento';
@@ -3550,9 +4433,17 @@ function renderResumo(){
   const mkAntResumo=llMesAnterior(fmk);
   const totOpKpi=sumUnitWeight(units);
   const totOpLL=sumUnitWeight(units.filter(u=>(D.unidades_info[u]||{}).gerente!=='O.P'));
-  window._resumoLists.unidadesOp={title:'🏢 Unidades em Operação',items:units.slice().sort((a,b)=>dispName(a).localeCompare(dispName(b))).map(u=>({nome:dispName(u),det:(u.includes('BELVEDERE')?'conta como 4':u.includes('BURITIS')?'conta como 2':'conta como 1')}))};
-  const kpiUopRo=`<div class="kpi k-navy" style="cursor:pointer" onclick="mostrarListaResumo('unidadesOp')"><div class="kpi-lbl">🏢 Unidades em Operação</div><div class="kpi-val">${totOpKpi}</div><div class="kpi-sub">OP=4 · Buritis=2 · 👆 ver todas</div></div>`;
-  const kpiUopLL=`<div class="kpi k-navy"><div class="kpi-lbl">🏢 Unidades em Operação</div><div class="kpi-val">${totOpLL}</div><div class="kpi-sub">exceto O.P (4 unidades) · Buritis=2</div></div>`;
+  // Detail/subtítulo calculados de verdade a partir de UNIT_WEIGHT_OVERRIDE (não mais texto fixo
+  // "OP=4 · Buritis=2") -- assim, se algum dia mudar quem tem peso extra (ou se uma duplicata
+  // escapar da migração automática abaixo), o número mostrado bate com a explicação ao lado dele
+  // em vez de ficar uma legenda congelada que não reflete mais o dado real.
+  window._resumoLists.unidadesOp={title:'🏢 Unidades em Operação',items:units.slice().sort((a,b)=>dispName(a).localeCompare(dispName(b))).map(u=>({nome:dispName(u),det:'conta como '+unitWeight(u)}))};
+  const pesosExtrasTxt=Object.keys(UNIT_WEIGHT_OVERRIDE).filter(u=>units.includes(u)).map(u=>dispName(u).split(' - ')[0]+'='+UNIT_WEIGHT_OVERRIDE[u]).join(' · ');
+  const duplicatasResumo=detectarUnidadesDuplicadasPorNucleo();
+  const avisoDupTxt=duplicatasResumo.length?(' · ⚠️ '+duplicatasResumo.length+' possível(is) duplicata(s) — avise a Andressa'):'';
+  const kpiUopRo=`<div class="kpi k-navy" style="cursor:pointer" onclick="mostrarListaResumo('unidadesOp')"><div class="kpi-lbl">🏢 Unidades em Operação</div><div class="kpi-val">${totOpKpi}</div><div class="kpi-sub">${pesosExtrasTxt||'sem peso extra'}${avisoDupTxt} · 👆 ver todas</div></div>`;
+  const pesosExtrasLLTxt=Object.keys(UNIT_WEIGHT_OVERRIDE).filter(u=>units.includes(u)&&(D.unidades_info[u]||{}).gerente!=='O.P').map(u=>dispName(u).split(' - ')[0]+'='+UNIT_WEIGHT_OVERRIDE[u]).join(' · ');
+  const kpiUopLL=`<div class="kpi k-navy"><div class="kpi-lbl">🏢 Unidades em Operação</div><div class="kpi-val">${totOpLL}</div><div class="kpi-sub">exceto O.P${pesosExtrasLLTxt?(' · '+pesosExtrasLLTxt):''}</div></div>`;
   const pctLucroResumo=llk.total>0?llk.lucro/llk.total:0, pctPrejuizoResumo=llk.total>0?llk.prejuizo/llk.total:0;
   g('rll-kpis').innerHTML=kpiUopLL+`
     <div class="kpi"><div class="kpi-lbl">LL Estimado - Rede</div><div class="kpi-val">${fatBR(metaLL)}</div><div class="kpi-sub">${FAT_MESES_NOME[fmk]||fmk}</div></div>
@@ -3776,6 +4667,12 @@ function renderFat(){
   const temConv=convRedeLeads>0;
   const convRedePct=temConv?convRedeVendas/convRedeLeads:null;
   const churnRedePct=temChurn?churnRedeChurned/churnRedeAtivos:null;
+  // Meta de Vendas / Vendas Realizadas / % / Adições Líquidas — mesma fonte usada na aba Vendas
+  // (D.metas_mensais e D.vendas_monthly), pra manter os números coerentes entre as duas telas.
+  const metaVendasRede=units.reduce((s,u)=>s+((D.metas_mensais[mk]||{})[u]||0),0);
+  const vendasRealRede=units.reduce((s,u)=>s+((D.vendas_monthly[u]||{})[mk]||0),0);
+  const pctVendasRede=metaVendasRede>0?vendasRealRede/metaVendasRede:null;
+  const addLiqRede=temChurn?vendasRealRede-churnRedeChurned:null;
   g('fat-kpis').innerHTML=`
     <div class="kpi k-navy"><div class="kpi-lbl">Meta Fat.</div><div class="kpi-val">${fatBR(a.fm)}</div><div class="kpi-sub">${FAT_MESES_NOME[mk]||mk}</div></div>
     <div class="kpi k-blue"><div class="kpi-lbl">Tendência ($)</div><div class="kpi-val">${fatBR(a.tend)}</div><div class="kpi-sub">projeção do mês</div></div>
@@ -3785,7 +4682,11 @@ function renderFat(){
     <div class="kpi" style="cursor:pointer" onclick="mostrarListaFat('inadAll')"><div class="kpi-lbl">Inad.</div><div class="kpi-val" style="color:${a.inad>0?'#E53935':'var(--dark)'}">${fatBR(a.inad)}</div><div class="kpi-sub">👆 ver unidades</div></div>
     <div class="kpi" style="cursor:pointer" onclick="mostrarListaFat('inadAll')"><div class="kpi-lbl">Inad. (%)</div><div class="kpi-val" style="color:${a.inadp>.05?'#E53935':a.inadp>.02?'#b37000':'#0a7a00'}">${(a.inadp*100).toFixed(1)}%</div><div class="kpi-sub">sobre tendência · 👆 ver unidades</div></div>
     <div class="kpi k-navy"><div class="kpi-lbl">Ticket Médio</div><div class="kpi-val">${fatBR(a.tk)}</div><div class="kpi-sub">${D.tk_auto?'auto · valor mensal dos ativos':'ponderado por base'}</div></div>
+    <div class="kpi k-navy"><div class="kpi-lbl">Meta de Vendas</div><div class="kpi-val">${fN(metaVendasRede)}</div><div class="kpi-sub">${FAT_MESES_NOME[mk]||mk}</div></div>
+    <div class="kpi k-green"><div class="kpi-lbl">Vendas Realizadas</div><div class="kpi-val">${fN(vendasRealRede)}</div><div class="kpi-sub">${parcial?'mês em andamento':'total do mês'}</div></div>
+    <div class="kpi ${pctVendasRede!=null&&pctVendasRede>=1?'k-green':''}"><div class="kpi-lbl">% Meta de Vendas</div><div class="kpi-val" style="color:${pctVendasRede==null?'var(--gray)':pctVendasRede>=1?'#0a7a00':pctVendasRede>=.8?'#b37000':'#E53935'}">${pctVendasRede==null?'—':(pctVendasRede*100).toFixed(1)+'%'}</div><div class="kpi-sub">vendas ÷ meta de vendas</div></div>
     <div class="kpi" style="cursor:pointer" onclick="mostrarListaFat('churn')"><div class="kpi-lbl">Churn (%)</div><div class="kpi-val" style="color:${!temChurn?'var(--gray)':churnRedePct>0.08?'#E53935':'#0a7a00'}">${temChurn?(churnRedePct*100).toFixed(1)+'%':'—'}</div><div class="kpi-sub">${temChurn?'meta da rede: 8% · 👆 ver unidades':'suba a base de clientes · meta: 8%'}</div></div>
+    <div class="kpi ${temChurn&&addLiqRede>=0?'k-green':''}"><div class="kpi-lbl">Adições Líquidas</div><div class="kpi-val" style="color:${!temChurn?'var(--gray)':addLiqRede>=0?'#0a7a00':'#E53935'}">${!temChurn?'—':(addLiqRede>=0?'+':'')+fN(addLiqRede)}</div><div class="kpi-sub">vendas − churn${temChurn?'':' · suba a base de clientes'}</div></div>
     <div class="kpi k-green" style="cursor:pointer" onclick="mostrarListaFat('acima')"><div class="kpi-lbl">Unidades (+) da Meta</div><div class="kpi-val">${acimaMeta}<span style="font-size:13px;color:var(--gray)"> / ${totalUnidFat}</span></div><div class="kpi-sub">${totalUnidFat?(acimaMeta/totalUnidFat*100).toFixed(0):'0'}% · tendência ≥ 100% · 👆 ver unidades</div></div>
     <div class="kpi" style="cursor:pointer" onclick="mostrarListaFat('abaixo')"><div class="kpi-lbl">Unidades (-) da Meta</div><div class="kpi-val" style="color:#E53935">${abaixoMeta}<span style="font-size:13px;color:var(--gray)"> / ${totalUnidFat}</span></div><div class="kpi-sub">${totalUnidFat?(abaixoMeta/totalUnidFat*100).toFixed(0):'0'}% · tendência &lt; 100% · 👆 ver unidades</div></div>
     <div class="kpi" style="cursor:pointer" onclick="mostrarListaFat('conversao')"><div class="kpi-lbl">Conversão da Rede</div><div class="kpi-val" style="color:${!temConv?'var(--gray)':'var(--navy)'}">${temConv?(convRedePct*100).toFixed(1)+'%':'—'}</div><div class="kpi-sub">${temConv?'leads → vendas · 👆 ver unidades':'suba a planilha de Leads/Acompanhamento'}</div></div>`;
@@ -5016,7 +5917,7 @@ function renderQInsights(units,ui){
 
 // ── TABLE ROWS
 function buildRows(data){
-  if(!data.length)return'<tr><td colspan="8" style="text-align:center;padding:20px;color:var(--gray)">Nenhuma unidade</td></tr>';
+  if(!data.length)return'<tr><td colspan="10" style="text-align:center;padding:20px;color:var(--gray)">Nenhuma unidade</td></tr>';
   const bg={green:'rgba(21,128,61,.05)',yellow:'rgba(244,162,40,.05)',red:'rgba(229,57,53,.04)'};
   return data.map((r,i)=>{
     const p=r.pct,bar=Math.min(p*100,100),fk=p>=1?'green':p>=0.8?'yellow':'red';
@@ -5026,6 +5927,8 @@ function buildRows(data){
       <td style="color:var(--gray)">${r.gerente||'–'}</td>
       <td class="tr">${fN(r.meta)}</td><td class="tr fw">${fN(r.vendas)}</td>
       <td class="tr ${pCls(p)}">${fP(p)}</td>
+      <td class="tr" style="color:${r.churn==null?'var(--gray)':r.churn>0.08?'#E53935':'#0a7a00'}">${r.churn==null?'–':(r.churn*100).toFixed(1)+'%'}</td>
+      <td class="tr" style="color:${r.addLiq==null?'var(--gray)':r.addLiq>=0?'#0a7a00':'#E53935'}">${r.addLiq==null?'–':(r.addLiq>=0?'+':'')+fN(r.addLiq)}</td>
       <td style="min-width:110px">
         <div class="bar"><div class="bf ${brCls(p)}" style="width:${bar.toFixed(0)}%"></div></div>
         <div style="font-size:8px;color:var(--gray);margin-top:1px">${bar.toFixed(0)}%</div>
@@ -5310,10 +6213,16 @@ function processarLinhasCadastro(rows,fname){
 
 // ── MODAL UPLOAD ────────────────────────────────────────
 let UPLOAD_TARGET='vendas';
+// Quando true, o cadastro de unidade foi aberto a partir do botão "➕ Cadastrar
+// Unidade" da aba Ranking Campanhas — depois de salvar, encadeia direto para o
+// modal de Participação das Unidades (já com a unidade recém-criada selecionada),
+// já que esse é o fluxo típico (unidade nova no meio do mês → cadastro → definir
+// em quais campanhas ela entra).
+let NU_CONTEXTO_CAMPANHA=false;
 function abrirModal(target){
   UPLOAD_TARGET=target||'vendas';
   const go=document.getElementById('upload-go');
-  if(go)go.textContent=UPLOAD_TARGET==='fat'?'💰 Carregar Metas do Mês':(UPLOAD_TARGET==='novaunidade'?'➕ Continuar':(UPLOAD_TARGET==='editarvendas'?'✏️ Continuar':(UPLOAD_TARGET==='participacao'?'⚙️ Continuar':'📂 Carregar Base')));
+  if(go)go.textContent=UPLOAD_TARGET==='fat'?'💰 Carregar Metas do Mês':((UPLOAD_TARGET==='novaunidade'||UPLOAD_TARGET==='novaunidadecampanha')?'➕ Continuar':(UPLOAD_TARGET==='editarvendas'?'✏️ Continuar':(UPLOAD_TARGET==='participacao'?'⚙️ Continuar':(UPLOAD_TARGET==='contatos'?'📇 Carregar Contatos':'📂 Carregar Base'))));
   const overlay=document.getElementById('upload-overlay');
   const pwd=document.getElementById('upload-pwd');
   const err=document.getElementById('upload-pwd-err');
@@ -5334,12 +6243,12 @@ function onPwdInput(){
   const err=document.getElementById('upload-pwd-err');
   pwd.classList.remove('shake');
   err.textContent='';
-  btn.disabled=(pwd.value!=='9083');
+  btn.disabled=(pwd.value!=='FT2026');
 }
 
 function tentarSenha(){
   const pwd=document.getElementById('upload-pwd');
-  if(pwd.value==='9083'){
+  if(pwd.value==='FT2026'){
     triggerUpload();
   } else {
     pwd.classList.remove('shake');
@@ -5351,10 +6260,27 @@ function tentarSenha(){
     setTimeout(()=>pwd.focus(),50);
   }
 }
+// Recuperação de senha: como este é um arquivo estático (sem servidor próprio), não é
+// possível disparar um e-mail automaticamente sem um serviço externo. Abrimos o cliente de
+// e-mail da própria Andressa já preenchido para os dois endereços — ela só precisa clicar em
+// enviar. Isso não é um risco de segurança novo: a senha já fica visível a quem abrir o
+// código-fonte do arquivo, então mostrá-la aqui não expõe nada que já não estivesse exposto.
+function recuperarSenha(){
+  const destinatarios='andressa.monts.sa@gmail.com,andressa@fasttennis.com.br';
+  const assunto=encodeURIComponent('Recuperação de senha — Dashboard Fast Tennis');
+  const corpo=encodeURIComponent('A senha de upload do Dashboard Fast Tennis é: FT2026\n\n(e-mail gerado automaticamente pelo dashboard — clique em enviar para registrar/receber a senha)');
+  window.location.href='mailto:'+destinatarios+'?subject='+assunto+'&body='+corpo;
+}
 
 function triggerUpload(){
   if(UPLOAD_TARGET==='novaunidade'){
     fecharModal();
+    abrirModalNU();
+    return;
+  }
+  if(UPLOAD_TARGET==='novaunidadecampanha'){
+    fecharModal();
+    NU_CONTEXTO_CAMPANHA=true;
     abrirModalNU();
     return;
   }
@@ -5368,7 +6294,7 @@ function triggerUpload(){
     abrirModalPU();
     return;
   }
-  const id=UPLOAD_TARGET==='fat'?'upload-fat-input':'upload-vendas-input';
+  const id=UPLOAD_TARGET==='fat'?'upload-fat-input':(UPLOAD_TARGET==='contatos'?'upload-contatos-input':'upload-vendas-input');
   document.getElementById(id).click();
 }
 
@@ -5409,6 +6335,9 @@ function abrirModalNU(){
 }
 function fecharModalNU(){
   document.getElementById('nu-overlay').style.display='none';
+  // Evita que um cadastro cancelado (sem salvar) deixe o encadeamento pra
+  // Participação "pendurado" pro próximo cadastro feito pelo botão global.
+  NU_CONTEXTO_CAMPANHA=false;
 }
 function nuChaveUnidade(){
   const nome=document.getElementById('nu-nome').value.trim();
@@ -5486,10 +6415,24 @@ function salvarNovaUnidade(){
     localStorage.setItem('ft_novas_unidades',JSON.stringify(salvas));
   }catch(e){console.warn('salvar nova unidade:',e);}
 
+  const vinhaDaCampanha=NU_CONTEXTO_CAMPANHA; // captura ANTES de fecharModalNU() resetar a flag
   rebuildAllFilters();
   fecharModalNU();
   try{renderActive();}catch(e){}
   baixarJsonNovaUnidade(chave,info,alias);
+
+  if(vinhaDaCampanha){
+    // Cadastro feito a partir da aba Ranking Campanhas: o cadastro em si NÃO
+    // grava nada em Faturamento/Metas/Vendas (só D.unidades_info) — a unidade
+    // só passa a contar nessas outras abas quando alguma base futura (Metas,
+    // Faturamento, Base de Clientes) trouxer dado pra ela. Encadeia direto pro
+    // modal de Participação, já com esta unidade selecionada, pra você decidir
+    // agora em quais campanhas ela entra (ex.: só Período, não Mensal).
+    alert('✅ Unidade cadastrada: '+chave+'\n\nEsse cadastro, sozinho, não afeta Faturamento, Raio X ou outras abas — ela só passa a contar nelas quando você subir uma base (Metas do Mês, Faturamento, Base de Clientes) que já a inclua.\n\n📊 Baixei um arquivo JSON com os dados dessa unidade — me envie esse arquivo (ou suba no GitHub) para eu incluir na próxima versão publicada do dashboard.'+(alias?'':'\n\n⚠️ Você não informou o nome usado na planilha de Vendas/Clientes — se a primeira base de vendas dessa unidade não for reconhecida automaticamente, me avise o nome exato para eu completar o mapeamento.')+'\n\nAgora escolha em quais campanhas ela participa (Mensal e/ou Período podem ter datas diferentes, ou uma delas ficar vazia).');
+    abrirModalPU(chave);
+    return;
+  }
+
   alert('✅ Unidade cadastrada: '+chave+'\n\nJá aparece nos filtros AQUI NESTE COMPUTADOR/NAVEGADOR e vai entrar automaticamente nos relatórios do mês assim que você lançar Meta ou Venda para ela.\n\n📊 Para ela aparecer em TODOS os computadores, baixei um arquivo JSON com os dados dessa unidade — me envie esse arquivo (ou suba no GitHub) para eu incluir na próxima versão publicada do dashboard.'+(alias?'':'\n\n⚠️ Você não informou o nome usado na planilha de Vendas/Clientes — se a primeira base de vendas dessa unidade não for reconhecida automaticamente, me avise o nome exato para eu completar o mapeamento.'));
 }
 // ══ EDITAR VENDAS (correção manual pontual, unidade + mês) ══
@@ -5576,10 +6519,11 @@ function salvarEdicaoVendas(){
 // renderCampanhaPeriodo, que já respeitam esses dois campos). São campos
 // independentes — dá pra uma unidade participar de um tipo de campanha sem
 // participar do outro (ex.: unidade nova, que abriu no meio do mês).
-function abrirModalPU(){
+function abrirModalPU(unidadePreSelecionada){
   const sel=document.getElementById('pu-unidade');
   const units=Object.keys(D.unidades_info||{}).sort((a,b)=>dispName(a).localeCompare(dispName(b)));
   sel.innerHTML=units.map(u=>`<option value="${u}">${dispName(u)}</option>`).join('');
+  if(unidadePreSelecionada&&units.includes(unidadePreSelecionada))sel.value=unidadePreSelecionada;
   document.getElementById('pu-err').textContent='';
   puAtualizarAtual();
   document.getElementById('pu-overlay').style.display='flex';
@@ -5654,6 +6598,39 @@ const CAMPOS_SNAPSHOT_DADOS=['fat_data','fat_meta','fat_ref','metas_mensais','un
   'vmeta','plano_nomes','fat_novas_daily','fat_total_daily','receita_avulsa_loc_mensal',
   'tk_auto','churn_mensal','conversao_mensal','ocupacao_mensal','ocupacao_real','cluster_op',
   'tend_churn_mensal','custo_fixo'];
+// Renomeia uma unidade em TODOS os campos de D que podem guardar dado por unidade (usa a mesma
+// lista CAMPOS_SNAPSHOT_DADOS) -- cobre tanto campos direto {unidade: ...} quanto aninhados por
+// mês {mesKey: {unidade: ...}}. Usado por migrações pontuais (ex.: corrigir um nome cadastrado
+// com typo numa sessão anterior deste navegador, antes da correção existir -- ver
+// NOME_EXIBICAO_CORRECOES/NUCLEO_CORRECOES).
+function renomearUnidadeEmTodosCampos(chaveAntiga,chaveNova){
+  if(!chaveAntiga||!chaveNova||chaveAntiga===chaveNova)return;
+  // fat_meta_oficial/metas_vendas_oficial guardam a meta "protegida" (vinda da Construção de
+  // Metas, ver processarArquivoConstrucaoMetas) por unidade/mês — não estão em
+  // CAMPOS_SNAPSHOT_DADOS (lista é só do snapshot do GitHub), mas também precisam ser migrados,
+  // senão a proteção contra sobrescrita fica presa na chave antiga.
+  const CAMPOS_EXTRA=['fat_meta_oficial','metas_vendas_oficial'];
+  CAMPOS_SNAPSHOT_DADOS.concat(CAMPOS_EXTRA).forEach(campo=>{
+    const obj=D[campo];
+    if(!obj||typeof obj!=='object')return;
+    if(Object.prototype.hasOwnProperty.call(obj,chaveAntiga)){
+      if(!Object.prototype.hasOwnProperty.call(obj,chaveNova))obj[chaveNova]=obj[chaveAntiga];
+      delete obj[chaveAntiga];
+    }
+    Object.keys(obj).forEach(k1=>{
+      const nivel2=obj[k1];
+      if(nivel2&&typeof nivel2==='object'&&Object.prototype.hasOwnProperty.call(nivel2,chaveAntiga)){
+        if(!Object.prototype.hasOwnProperty.call(nivel2,chaveNova))nivel2[chaveNova]=nivel2[chaveAntiga];
+        delete nivel2[chaveAntiga];
+      }
+    });
+  });
+  Object.keys(UPLOAD_UNIT_MAP).forEach(k=>{ if(UPLOAD_UNIT_MAP[k]===chaveAntiga)UPLOAD_UNIT_MAP[k]=chaveNova; });
+  if(D.contatos_franqueados&&Object.prototype.hasOwnProperty.call(D.contatos_franqueados,chaveAntiga)){
+    if(!D.contatos_franqueados[chaveNova])D.contatos_franqueados[chaveNova]=D.contatos_franqueados[chaveAntiga];
+    delete D.contatos_franqueados[chaveAntiga];
+  }
+}
 // Config do repositório onde este dashboard está publicado (GitHub Pages).
 // GITHUB_TOKEN: token de acesso pessoal do GitHub (clássico, escopo "repo"),
 // gerado em github.com/settings/tokens/new. Fica embutido neste arquivo público —
@@ -5685,7 +6662,7 @@ function baixarSnapshotLocal(jsonStr){
 }
 async function publicarDadosGitHub(){
   const pin=prompt('Senha de upload:');
-  if(pin!=='9083'){ if(pin!==null)alert('❌ Senha incorreta.'); return; }
+  if(pin!=='FT2026'){ if(pin!==null)alert('❌ Senha incorreta.'); return; }
 
   const snap={_snapshot_geradoEm:new Date().toISOString()};
   CAMPOS_SNAPSHOT_DADOS.forEach(k=>{ snap[k]=(D[k]!==undefined)?D[k]:null; });
@@ -5923,6 +6900,770 @@ function detectMesArquivo(fname){
   const m=String(digitado||'').match(/^(\d{1,2})\s*\/\s*(\d{4})$/);
   return m?m[2]+'-'+String(+m[1]).padStart(2,'0'):null;
 }
+// ══ CONSTRUÇÃO DE METAS (planilha mestre com 1 aba por mês, ex.: "Metas Agosto.2026") ══
+// Formato diferente da planilha de Faturamento Rede: em vez de 1 arquivo por mês com uma
+// aba só, este arquivo tem VÁRIAS abas, uma por mês, todas nomeadas "Metas <MêsPorExtenso>.<Ano>"
+// (ex.: "Metas Agosto.2026", "Metas Julho.2026"...). O antigo pickBestSheet() só reconhece nomes
+// de aba no formato "MM.AAAA" (número), então com essas abas por nome de mês ele sempre caía na
+// primeira aba do arquivo (ex.: "Metas Outubro.25") — e por isso a Meta de Agosto saía errada,
+// não importa qual mês a Andressa realmente quisesse subir. Corrigido processando aqui, à parte,
+// TODAS as abas "Metas <mês>.<ano>" do arquivo de uma vez (sem precisar perguntar o mês).
+//
+// Colunas usadas (validadas em 02/08/2026 comparando com os fechamentos reais de Belvedere/
+// Buritis/Campo Belo já usados noutras partes do projeto): "Meta de Vendas" = meta de vendas do
+// mês (quantidade) — NÃO confundir com "Vendas BP", que é uma métrica de escala bem maior (~10x),
+// provavelmente ligada ao Business Plan anual, não à meta operacional do mês. "Total Meta de
+// Receita" = meta de faturamento do mês (R$).
+//
+// Por instrução da Andressa (02/08/2026): quando existir mais de uma aba do mesmo mês (ex.:
+// "Metas Agosto.2026" + "Revisado Metas Agosto.2026" + "Cópia de Revisado Metas Agosto."),
+// usamos só a aba "original" (sem prefixo "Revisado"/"Cópia") por enquanto — a partir de uma
+// próxima versão da planilha, vai ter só 1 aba por mês.
+//
+// Mapeamento de unidade: este arquivo usa código curto ("FT AGUAS CLARAS - DF"), diferente do
+// nome canônico do dashboard ("Fast Tennis AGUAS CLARAS - BRASÍLIA"). Mapeamos pelo "nome
+// núcleo" (o trecho entre "FT "/"Fast Tennis " e o sufixo " - <cidade/UF>"), ignorando acento/
+// caixa — testado contra as 65 unidades cadastradas e bateu 100%. (Atenção: a própria aba "BP"
+// deste arquivo tem uma tabela De-Para com as duas colunas de nome desalinhadas entre si — não
+// usamos essa tabela por isso; vale avisar quem mantém a planilha.)
+function detectarSheetsConstrucaoMetas(wb){
+  const MESES_NOME={janeiro:1,fevereiro:2,'março':3,marco:3,abril:4,maio:5,junho:6,julho:7,agosto:8,setembro:9,outubro:10,novembro:11,dezembro:12};
+  const norm=s=>String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().trim();
+  const out=[];
+  wb.SheetNames.forEach(sn=>{
+    const n=norm(sn);
+    if(/^revisado\b/.test(n)||/^copia\b/.test(n))return; // pula variantes revisadas/duplicadas por enquanto
+    const m=n.match(/^metas\s+([a-zà-ú]+)\.?\s*(\d{2,4})$/);
+    if(!m)return;
+    const mesNum=MESES_NOME[m[1]];
+    if(!mesNum)return;
+    const anoStr=m[2];
+    const ano=anoStr.length===2?2000+ +anoStr:+anoStr;
+    out.push({sheetName:sn, mesKey:ano+'-'+String(mesNum).padStart(2,'0')});
+  });
+  return out;
+}
+// Correções conhecidas de núcleo (nome normalizado — maiúsculo, sem acento) que aparecem
+// diferentes entre fontes (BI de Construção de Metas, planilha de contatos de franqueados) mas
+// são a MESMA unidade física já cadastrada no dashboard — por instrução da Andressa (03/08/2026).
+// Chave = como o núcleo sai normalizado a partir da fonte "errada"; valor = núcleo canônico já
+// usado no dashboard (também normalizado, sem acento — é só pra bater no cache de match).
+const NUCLEO_CORRECOES={
+  'TABAUTE':'TAUBATE',              // "FT TABAUTE - SP" (Construção de Metas) -- nome certo é Taubaté
+  'BURITIS I':'BURITIS',            // "Fast Tennis Buritis I/II" (planilha de contatos) -- mesma unidade física BURITIS
+  'BURITIS II':'BURITIS',
+  'INDAIATUABA':'INDAIATUBA',       // typo na planilha de contatos ("Indaiatuaba" com "a" a mais)
+  'ORLA DA PAMPULHA':'ORLA PAMPULHA' // "da" a mais na planilha de contatos
+};
+// Nome de EXIBIÇÃO (com acento, pro cadastro/rótulo ficar bonito) pras correções acima que ainda
+// não existem no dashboard e por isso passam pelo cadastro automático (ver
+// autoCadastrarUnidadeConstrucaoMetas) — só é preciso entrada aqui quando o valor de
+// NUCLEO_CORRECOES aponta pra uma unidade que AINDA NÃO EXISTE (senão o cadastro automático nem
+// roda, porque mapUnitConstrucaoMetas já encontra a unidade existente antes).
+const NOME_EXIBICAO_CORRECOES={'TABAUTE':'TAUBATÉ'};
+function nucleoUnidadeCurta(codigo){
+  // Tira o prefixo ("FT " ou "Fast Tennis ") e o sufixo depois do ÚLTIMO " - " (cidade/UF,
+  // em qualquer formato: sigla de 2 letras, abreviação de cidade, nome completo da cidade)
+  // — sobra só o "núcleo" do nome. Ex.: "FT AGUAS CLARAS - DF" -> "AGUAS CLARAS";
+  // "Fast Tennis CAPIM MACIO - NAT" -> "CAPIM MACIO"; "Fast Tennis BELVEDERE - BELO
+  // HORIZONTE" -> "BELVEDERE". As abas mais antigas desta planilha usam o nome completo
+  // (sem "FT") e sufixos de tamanho variável — por isso não fixamos o formato do sufixo.
+  const norm=s=>String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toUpperCase().trim();
+  let s=norm(codigo).replace(/^(FAST TENNIS|FT)\s+/,'');
+  s=s.replace(/\s*\([A-Z]{2}\)\s*$/,''); // algumas abas antigas usam "(SP)"/"(CE)" em vez de "- SÃO PAULO"
+  // Tolera falta/excesso de espaço em volta do traço separador — fontes diferentes (planilha de
+  // contatos de franqueados, por ex.) às vezes vêm sem o espaço antes do traço (ex.: "Tirol-
+  // Natal" em vez de "Tirol - Natal"), ou com espaço duplicado (ex.: "Buritis I  - Belo Horizonte").
+  s=s.replace(/\s*-\s*/g,' - ');
+  const lastDash=s.lastIndexOf(' - ');
+  if(lastDash>=0)s=s.slice(0,lastDash).trim();
+  if(s&&NUCLEO_CORRECOES[s])s=NUCLEO_CORRECOES[s];
+  return s||null;
+}
+// Verificação de integridade: agrupa TODAS as unidades cadastradas pelo núcleo (mesma função de
+// match usada nos uploads) e devolve qualquer grupo com mais de 1 chave -- ou seja, unidades que
+// deveriam ser a mesma coisa mas estão cadastradas em duplicidade (ex.: "Fast Tennis BURITIS -
+// BELO HORIZONTE" e "Fast Tennis Buritis I - ..." ao mesmo tempo). A migração em iniciarDashboard
+// já corrige os casos conhecidos (Buritis/Indaiatuba/Orla Pampulha) automaticamente, mas esta
+// função roda de novo depois pra pegar qualquer caso NOVO/imprevisto e avisar em vez de deixar
+// inflar silenciosamente a contagem de "Unidades em Operação".
+function detectarUnidadesDuplicadasPorNucleo(){
+  const porNucleo={};
+  Object.keys(D.unidades_info).forEach(u=>{
+    const n=nucleoUnidadeCurta(u);
+    if(!n)return;
+    (porNucleo[n]=porNucleo[n]||[]).push(u);
+  });
+  return Object.keys(porNucleo).filter(n=>porNucleo[n].length>1).map(n=>({nucleo:n,chaves:porNucleo[n]}));
+}
+let _nucleoCanonicoUnidadesCache=null;
+function mapUnitConstrucaoMetas(codigoCurto){
+  const raw=String(codigoCurto||'').trim();
+  if(!raw)return null;
+  if(D.unidades_info[raw])return raw; // já veio com o nome canônico exato — sem precisar mapear
+  if(UPLOAD_UNIT_MAP[raw])return UPLOAD_UNIT_MAP[raw]; // razão social alternativa (ex.: "Fast Tennis Sylvio Barbosa")
+  {
+    const rawLower=raw.toLowerCase();
+    for(const k in UPLOAD_UNIT_MAP){if(k.toLowerCase()===rawLower)return UPLOAD_UNIT_MAP[k];}
+  }
+  if(!_nucleoCanonicoUnidadesCache){
+    _nucleoCanonicoUnidadesCache={};
+    Object.keys(D.unidades_info).forEach(u=>{
+      const nucleo=nucleoUnidadeCurta(u);
+      if(nucleo)_nucleoCanonicoUnidadesCache[nucleo]=u;
+    });
+    // núcleos das razões sociais alternativas (UPLOAD_UNIT_MAP), para pegar variações tipo
+    // "Fast Tennis LAGOA SECA - BELO HORIZONTE" (nome completo com sufixo de cidade, mas com a razão social antiga)
+    Object.keys(UPLOAD_UNIT_MAP).forEach(k=>{
+      const nucleo=nucleoUnidadeCurta(k);
+      if(nucleo&&!_nucleoCanonicoUnidadesCache[nucleo])_nucleoCanonicoUnidadesCache[nucleo]=UPLOAD_UNIT_MAP[k];
+    });
+  }
+  const nucleo=nucleoUnidadeCurta(raw);
+  return nucleo?(_nucleoCanonicoUnidadesCache[nucleo]||null):null;
+}
+// Cadastra automaticamente, com o melhor esforço possível, uma unidade que aparece na
+// Construção de Metas mas ainda não existe em D.unidades_info — por instrução da Andressa
+// (03/08/2026): toda unidade nova do arquivo de Metas deve entrar sozinha, sem exigir
+// ➕ Nova Unidade manual pra cada uma. Só dá pra usar o que o PRÓPRIO arquivo já traz:
+//   nome  = núcleo do código (ex.: "FT EUSEBIO - CE" -> "EUSEBIO"), MANTENDO os acentos
+//           originais (ao contrário de nucleoUnidadeCurta/normMid, que tiram acento só pra
+//           efeito de comparação/match — o nome cadastrado deve ficar bonito, como os outros).
+//   estado = a UF depois do último " - " (é sempre UF nesta planilha, nunca cidade — ex.:
+//           "Fast Tennis GUARARAPES - FORTALEZA" já cadastrada usa cidade, mas o código curto
+//           da Construção de Metas pra essa mesma unidade é "FT GUARARAPES - CE", a UF).
+//   cidade = fica em branco (não vem no arquivo) — só afeta o filtro de Cidade, não os KPIs.
+//   gerente = vem da própria coluna "Gerente" da planilha.
+//   quadras = vem da coluna "Quadras" (não separa "ao ar livre"/coberta, então cai tudo em
+//           qda_ad e qda_inf fica 0 — aproximação, sinalizada no alerta de resumo).
+// Se o código não tiver o formato esperado (sem núcleo reconhecível), devolve null e a
+// unidade cai de volta na lista antiga de "não mapeadas" (fica pro cadastro manual).
+function autoCadastrarUnidadeConstrucaoMetas(raw,gerenteRaw,quadrasRaw){
+  const rawTrim=String(raw||'').trim();
+  if(!rawTrim)return null;
+  const nucleoMatch=nucleoUnidadeCurta(rawTrim); // versão sem acento, só pra popular o cache de match
+  if(!nucleoMatch)return null;
+  let nomeOriginal=rawTrim.toUpperCase().replace(/^(FAST TENNIS|FT)\s+/i,'');
+  const lastDash=nomeOriginal.lastIndexOf(' - ');
+  const sufixoOriginal=lastDash>=0?nomeOriginal.slice(lastDash+3).trim():'';
+  if(lastDash>=0)nomeOriginal=nomeOriginal.slice(0,lastDash).trim();
+  if(!nomeOriginal)return null;
+  // Corrige erro de digitação conhecido na PRÓPRIA fonte (ver NOME_EXIBICAO_CORRECOES) — sem
+  // isso, o nome cadastrado repetiria o typo do BI todo mês (ex.: "TABAUTE" em vez de "TAUBATÉ").
+  {
+    const nucleoNorm=String(nomeOriginal).normalize('NFD').replace(/[̀-ͯ]/g,'').toUpperCase().trim();
+    if(NOME_EXIBICAO_CORRECOES[nucleoNorm])nomeOriginal=NOME_EXIBICAO_CORRECOES[nucleoNorm];
+  }
+  const estado=NU_ESTADOS.some(([uf])=>uf===sufixoOriginal.toUpperCase())?sufixoOriginal.toUpperCase():'';
+  const chave='Fast Tennis '+nomeOriginal+(estado?' - '+estado:'');
+  if(D.unidades_info[chave])return chave; // já cadastrada (ex.: outra linha/aba desta mesma subida)
+  const gerenteRawStr=String(gerenteRaw||'').trim();
+  const gerenteNorm=gerenteRawStr.normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase();
+  const gerente=gerenteNorm==='operacao propria'?'O.P':gerenteRawStr;
+  const quadras=Math.round(parseNumBR(quadrasRaw))||0;
+  const info={
+    unidade:chave,
+    dado:'FT '+nomeOriginal+(estado?' - '+estado:''),
+    estado, cidade:'', gerente,
+    regiao:estado?(REGION[estado]||''):'',
+    qda_ad:quadras, qda_inf:0, qda_total:quadras
+  };
+  D.unidades_info[chave]=info;
+  if(_nucleoCanonicoUnidadesCache)_nucleoCanonicoUnidadesCache[nucleoMatch]=chave;
+  try{
+    const salvas=JSON.parse(localStorage.getItem('ft_novas_unidades')||'[]');
+    salvas.push({chave,info,alias:'',savedAt:new Date().toISOString(),autoOrigem:'Construção de Metas ('+rawTrim+')'});
+    localStorage.setItem('ft_novas_unidades',JSON.stringify(salvas));
+  }catch(e){console.warn('salvar unidade auto-cadastrada:',e);}
+  return chave;
+}
+// Retorna true se o arquivo era desse formato (processado aqui, não continua pro fluxo antigo).
+function processarArquivoConstrucaoMetas(wb,fname){
+  const hdr=document.getElementById('hdr-date');
+  const sheets=detectarSheetsConstrucaoMetas(wb);
+  if(!sheets.length)return false; // não é esse formato — deixa o chamador seguir o fluxo normal
+
+  _nucleoCanonicoUnidadesCache=null; // recalcula a cada upload (unidades podem ter mudado)
+  const naoMapeadas=new Set();
+  const autoCadastradas=[]; // unidades novas cadastradas automaticamente nesta subida (ver abaixo)
+  const resumoMeses=[];
+  sheets.forEach(({sheetName,mesKey})=>{
+    const ws=wb.Sheets[sheetName];
+    const rows=XLSX.utils.sheet_to_json(ws,{raw:true,defval:null});
+    if(!rows.length)return;
+    const keys=Object.keys(rows[0]);
+    const colUn=keys.find(k=>k.trim().toLowerCase()==='unidade');
+    const colGer=keys.find(k=>k.trim().toLowerCase()==='gerente');
+    const colMv=keys.find(k=>k.trim().toLowerCase()==='meta de vendas');
+    const colFm=keys.find(k=>k.trim().toLowerCase()==='total meta de receita');
+    const colQd=keys.find(k=>k.trim().toLowerCase()==='quadras');
+    if(!colUn||!colMv||!colFm)return; // aba sem as colunas esperadas — ignora
+
+    const metas={}, fmeta={};
+    let nUn=0, fatDataAtualizado=false;
+    rows.forEach(r=>{
+      const raw=String(r[colUn]||'').trim();
+      if(!raw||/^total\s+rede$/i.test(raw))return; // pula linha de total da rede
+      let un=mapUnitConstrucaoMetas(raw);
+      if(!un){
+        // Por instrução da Andressa (03/08/2026): toda unidade que aparece na Construção de
+        // Metas mas ainda não está cadastrada no dashboard entra AUTOMATICAMENTE (sem precisar
+        // de ➕ Nova Unidade manual) — senão a Meta/Tendência da rede fica sistematicamente
+        // subestimada (silenciosamente faltando as unidades mais novas a cada mês).
+        un=autoCadastrarUnidadeConstrucaoMetas(raw,colGer?r[colGer]:null,colQd?r[colQd]:null);
+        if(!un){naoMapeadas.add(raw);return;}
+        autoCadastradas.push(un);
+      }
+      const mv=parseNumBR(r[colMv]);
+      const fm=parseNumBR(r[colFm]);
+      if(mv>0)metas[un]=Math.round(mv);
+      if(fm>0){
+        fmeta[un]=Math.round(fm);
+        // Atualiza (ou cria) o registro em D.fat_data pra essa unidade/mês — é esse campo
+        // ("fm") que a aba Faturamento realmente usa pro KPI "Meta Fat.", Gap e Atingimento
+        // em ~30 pontos do código, não D.fat_meta isolado. Sem isso, subir esta planilha
+        // mudaria D.fat_meta nos bastidores mas a tela continuaria mostrando o Fat. Meta
+        // antigo (ou nenhum, se o mês ainda não tiver Faturamento Rede carregado) — exatamente
+        // o sintoma "sobe com valor errado" que a Andressa reportou. Cria o registro mesmo se
+        // o Faturamento Rede daquele mês ainda não tiver sido carregado (comum: a meta é
+        // subida no início do mês, antes de haver qualquer Real do dia a dia).
+        if(!D.fat_data)D.fat_data={};
+        if(!D.fat_data[mesKey])D.fat_data[mesKey]={};
+        if(!D.fat_data[mesKey][un])D.fat_data[mesKey][un]={fm:0,tend:0,rd1:0,gap:0,inad:0,tk:0,bc:0,mv:0,rv:0};
+        const rec=D.fat_data[mesKey][un];
+        rec.fm=Math.round(fm);
+        rec.gap=(rec.tend||0)-rec.fm;
+        if(mv>0)rec.mv=Math.round(mv);
+        fatDataAtualizado=true;
+      }
+      if(colGer&&String(r[colGer]||'').trim()){
+        let gv=String(r[colGer]).trim();
+        const gvNorm=gv.normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase();
+        if(gvNorm==='operacao propria')gv='O.P';
+        if(D.unidades_info[un])D.unidades_info[un].gerente=gv;
+      }
+      nUn++;
+    });
+    if(Object.keys(metas).length){if(!D.metas_mensais)D.metas_mensais={};D.metas_mensais[mesKey]=metas;}
+    if(Object.keys(fmeta).length){if(!D.fat_meta)D.fat_meta={};D.fat_meta[mesKey]=fmeta;}
+    // "Oficial" = veio da Construção de Metas. Esses dois dicionários são a ÚNICA fonte que
+    // processarLinhasFat (upload de Faturamento Rede) respeita e NUNCA sobrescreve sozinha —
+    // é o que garante que, subindo o Faturamento Rede (real do dia a dia) depois da Construção
+    // de Metas, a meta não volte a ser trocada pelo valor (geralmente desatualizado) que vem
+    // dentro do próprio arquivo de Faturamento Rede. Sem isso, a ordem de upload dos dois
+    // arquivos no mês decidia qual meta "ganhava" — exatamente o "continua subindo errado".
+    if(Object.keys(metas).length){if(!D.metas_vendas_oficial)D.metas_vendas_oficial={};D.metas_vendas_oficial[mesKey]=Object.assign({},D.metas_vendas_oficial&&D.metas_vendas_oficial[mesKey],metas);}
+    if(Object.keys(fmeta).length){if(!D.fat_meta_oficial)D.fat_meta_oficial={};D.fat_meta_oficial[mesKey]=Object.assign({},D.fat_meta_oficial&&D.fat_meta_oficial[mesKey],fmeta);}
+    // Um upload de Construção de Metas para um mês/unidade já cadastrada em D.fat_data por um
+    // Faturamento Rede anterior deve corrigir o "fm" ali na hora (ver acima); mas se o Faturamento
+    // Rede daquele mês for subido de novo DEPOIS, ele reconstrói D.fat_data[mesKey] do zero — por
+    // isso a proteção via fat_meta_oficial/metas_vendas_oficial dentro de processarLinhasFat.
+    resumoMeses.push({mesKey,nUn,totFm:Object.values(fmeta).reduce((s,v)=>s+v,0),fatDataAtualizado});
+  });
+
+  if(!resumoMeses.length){
+    if(hdr)hdr.innerHTML='❌ Nenhuma aba de Metas processável (esperava colunas "Unidade", "Meta de Vendas" e "Total Meta de Receita").';
+    alert('❌ Encontrei aba(s) "Metas <mês>" neste arquivo, mas nenhuma tinha as colunas esperadas ("Unidade", "Meta de Vendas", "Total Meta de Receita"). Confira se o cabeçalho da planilha não mudou de nome.');
+    return true; // formato reconhecido, mas nada processável — não cai no fluxo antigo mesmo assim
+  }
+
+  try{rebuildAllFilters();}catch(e){try{rebuildGerenteFilter();}catch(e2){}}
+  // Persistir (mesmo storage usado pelo fluxo antigo de Metas do Mês/Faturamento Rede)
+  try{
+    const saved=JSON.parse(localStorage.getItem('ft_fat_oficial')||'{}');
+    saved.metas_mensais=saved.metas_mensais||{};
+    saved.fat_meta=saved.fat_meta||{};
+    saved.fat_data=saved.fat_data||{};
+    saved.metas_vendas_oficial=saved.metas_vendas_oficial||{};
+    saved.fat_meta_oficial=saved.fat_meta_oficial||{};
+    resumoMeses.forEach(({mesKey,fatDataAtualizado})=>{
+      if(D.metas_mensais[mesKey])saved.metas_mensais[mesKey]=D.metas_mensais[mesKey];
+      if(D.fat_meta[mesKey])saved.fat_meta[mesKey]=D.fat_meta[mesKey];
+      if(D.metas_vendas_oficial&&D.metas_vendas_oficial[mesKey])saved.metas_vendas_oficial[mesKey]=D.metas_vendas_oficial[mesKey];
+      if(D.fat_meta_oficial&&D.fat_meta_oficial[mesKey])saved.fat_meta_oficial[mesKey]=D.fat_meta_oficial[mesKey];
+      // Se atualizamos o "fm" dentro de D.fat_data (ver acima), persiste o mês inteiro
+      // de novo — senão um recarregamento da página voltaria a mostrar o Fat. Meta antigo.
+      if(fatDataAtualizado&&D.fat_data&&D.fat_data[mesKey])saved.fat_data[mesKey]=D.fat_data[mesKey];
+    });
+    saved.gerentes=saved.gerentes||{};
+    Object.keys(D.unidades_info).forEach(u=>{if(D.unidades_info[u].gerente)saved.gerentes[u]=D.unidades_info[u].gerente;});
+    saved.savedAt=new Date().toISOString();
+    localStorage.setItem('ft_fat_oficial',JSON.stringify(saved));
+  }catch(e){console.warn('save construcao metas:',e);}
+
+  const linhas=resumoMeses.map(r=>{
+    const [y,m]=r.mesKey.split('-');
+    return m+'/'+y+': '+r.nUn+' unidades · Meta Fat. R$ '+r.totFm.toLocaleString('pt-BR');
+  }).join('\n');
+  let msg='✅ Construção de Metas carregada:\n\n'+linhas;
+  if(autoCadastradas.length){
+    const unicas=[...new Set(autoCadastradas)];
+    msg+='\n\n🆕 Unidades novas cadastradas automaticamente (não existiam ainda no dashboard): '+unicas.join(', ')
+      +'\n\n⚠️ Cidade ficou em branco e Quadras foi jogado todo em "ao ar livre" (o arquivo não separa) — me avise se precisar corrigir algo, ou se alguma dessas NÃO for unidade nova de verdade (nome parecido com uma já cadastrada, e o núcleo não bateu).';
+  }
+  if(naoMapeadas.size){
+    msg+='\n\n⚠️ Unidades não reconhecidas mesmo com cadastro automático (formato de código inesperado — cadastre pelo botão ➕ Nova Unidade e suba de novo): '+[...naoMapeadas].join(', ');
+  }
+  alert(msg);
+  if(hdr)hdr.innerHTML='💰 Construção de Metas carregada<br><strong>'+resumoMeses.length+' mês(es)</strong>';
+  try{renderActive();}catch(e){}
+  return true;
+}
+
+// ══ UPLOAD: "DADOS CADASTRAIS UNIDADES E FRANQUEADOS" — contatos + quadras reais ══
+// Planilha de cadastro (não é mensal — reflete o estado ATUAL da rede): aba fixa "Unidades em
+// Operação" com Status/Unidade/Cidade/UF/Franqueados/Telefone/Email/Quadras Adultas Operando/
+// Quadras Infantis.../Qtds de Quadras em Operação. Usada para:
+//  1) Pré-preencher nome/e-mail do franqueado na aba 📧 Fechamento (botão "Copiar Destinatários"),
+//     sem precisar digitar contato unidade por unidade.
+//  2) Corrigir a Cidade e a divisão real de Quadras Adulto/Infantil — o cadastro automático feito
+//     a partir da Construção de Metas (ver autoCadastrarUnidadeConstrucaoMetas) só tem o total de
+//     quadras (sem separar adulto/infantil) e não traz Cidade, então esta planilha é a fonte mais
+//     precisa quando disponível.
+// Reaproveita mapUnitConstrucaoMetas/nucleoUnidadeCurta (mesmo "casador" de nomes já usado pela
+// Construção de Metas) — a planilha de contatos usa nomes tipo "Fast Tennis Aguas Claras -
+// Brasilia" (sem acento, Title Case), que o nucleo já normaliza pra bater com a chave canônica.
+function detectarPlanilhaContatosFranqueados(wb){
+  const norm=s=>String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().trim();
+  return wb.SheetNames.find(sn=>norm(sn)==='unidades em operacao')||null;
+}
+function processarArquivoContatosFranqueados(wb,fname){
+  const hdr=document.getElementById('hdr-date');
+  const sheetName=detectarPlanilhaContatosFranqueados(wb);
+  if(!sheetName)return false; // não é esse formato — deixa o chamador seguir o fluxo normal
+  const ws=wb.Sheets[sheetName];
+  const rows=XLSX.utils.sheet_to_json(ws,{raw:true,defval:null});
+  if(!rows.length)return false;
+  const keys=Object.keys(rows[0]);
+  const fc=(...alvos)=>keys.find(k=>alvos.includes(k.trim().toLowerCase()));
+  const colStatus=fc('status'), colUn=fc('unidade'), colCidade=fc('cidade'),
+        colFranq=fc('franqueados','franqueado'), colTel=fc('telefone'), colEmail=fc('email','e-mail'),
+        colQdAd=fc('quadras adultas operando'), colQdInf=fc('quadras infantis/infanto juvenil operando'),
+        colQdTotal=fc('qtds de quadras em operação','qtds de quadras em operacao');
+  if(!colUn||!colEmail){
+    if(hdr)hdr.innerHTML='❌ Colunas não encontradas (Unidade / Email) na aba "'+sheetName+'".';
+    return true;
+  }
+  if(!D.contatos_franqueados)D.contatos_franqueados={};
+  let nOk=0, nQuadrasAtualizadas=0;
+  const naoMapeadas=[];
+  const infoUpdates={}; // {unidade:{cidade?,qda_ad?,qda_inf?,qda_total?}} -- para persistir e reaplicar no reload
+  rows.forEach(r=>{
+    const raw=String(r[colUn]||'').trim();
+    if(!raw)return;
+    if(colStatus){
+      const st=String(r[colStatus]||'').trim().toLowerCase();
+      if(st&&st!=='operando')return; // ignora "Cessão de contratos"/"Legenda"/linhas em branco de status
+    }
+    const un=mapUnitConstrucaoMetas(raw);
+    if(!un){ naoMapeadas.push(raw); return; }
+    const email=String(r[colEmail]||'').trim();
+    const nome=String(r[colFranq]||'').trim();
+    if(email||nome){
+      D.contatos_franqueados[un]={nome, email, telefone:r[colTel]!=null?String(r[colTel]).trim():''};
+      nOk++;
+    }
+    // Quadras reais (adulto/infantil separados) e Cidade — mais precisos que o cadastro
+    // automático da Construção de Metas (que só tem o total, tudo jogado em "adulto").
+    if(D.unidades_info[un]){
+      const info=D.unidades_info[un];
+      const upd={};
+      if(colCidade&&r[colCidade]&&!info.cidade){ info.cidade=String(r[colCidade]).trim(); upd.cidade=info.cidade; }
+      if(colQdAd||colQdInf){
+        const qdAd=colQdAd?(Math.round(parseNumBR(r[colQdAd]))||0):info.qda_ad||0;
+        const qdInf=colQdInf?(Math.round(parseNumBR(r[colQdInf]))||0):info.qda_inf||0;
+        const qdTotal=colQdTotal&&r[colQdTotal]!=null?(Math.round(parseNumBR(r[colQdTotal]))||qdAd+qdInf):qdAd+qdInf;
+        if(qdAd||qdInf){ info.qda_ad=qdAd; info.qda_inf=qdInf; info.qda_total=qdTotal; nQuadrasAtualizadas++; upd.qda_ad=qdAd; upd.qda_inf=qdInf; upd.qda_total=qdTotal; }
+      }
+      if(Object.keys(upd).length)infoUpdates[un]=upd;
+    }
+  });
+  // Persiste (sobrevive ao recarregamento da página — não é afetado pelo "Limpar Cache Local",
+  // igual às unidades novas cadastradas manualmente: é um cadastro, não um dado recalculável).
+  try{ localStorage.setItem('ft_contatos_upload',JSON.stringify({contatos:D.contatos_franqueados,infoUpdates,savedAt:new Date().toISOString()})); }catch(e){console.warn('salvar contatos franqueados:',e);}
+  let msg='✅ Contatos de franqueados carregados — '+nOk+' unidade(s) com nome/e-mail'+(nQuadrasAtualizadas?' · '+nQuadrasAtualizadas+' com quadras atualizadas':'')+'.';
+  msg+='\n\nJá vale para "Copiar Destinatários" na aba 📧 Fechamento.';
+  if(naoMapeadas.length)msg+='\n\n⚠️ Unidades não reconhecidas (nome não bateu com nenhuma unidade cadastrada — confira se não é erro de digitação na planilha, ex.: cidade duplicada ou espaço faltando antes do traço): '+naoMapeadas.join(', ');
+  alert(msg);
+  if(hdr)hdr.innerHTML='📇 Contatos de Franqueados carregados<br><strong>'+nOk+' unidade(s)</strong>';
+  try{renderActive();}catch(e){}
+  return true;
+}
+function processarArquivoContatos(input){
+  const file=input.files[0]; if(!file)return;
+  try{fecharModal();}catch(e){}
+  input.value='';
+  const hdr=document.getElementById('hdr-date');
+  if(hdr)hdr.innerHTML='⏳ Lendo planilha de contatos...';
+  const fname=file.name;
+  const reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      const wb=XLSX.read(e.target.result,{type:'array',cellDates:true});
+      if(processarArquivoContatosFranqueados(wb,fname))return;
+      alert('Não consegui reconhecer o formato deste arquivo ('+fname+'). Confira se é mesmo a planilha "Dados cadastrais unidades e franqueados" (precisa ter uma aba chamada "Unidades em Operação").');
+      if(hdr)hdr.innerHTML='❌ Formato não reconhecido';
+    }catch(err){if(hdr)hdr.innerHTML='❌ Erro: '+err.message;}
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// ══ UPLOAD 3: "ASSINATURAS" — A cobrar × Pago, por dia e por unidade (banco de pagamentos) ══
+// Formato novo (a partir de 03/08/2026, por instrução da Andressa): substitui a antiga planilha
+// de "Faturamento Rede" como fonte de Tendência/Real D-1. Duas abas fixas — "Por dia" (rede
+// inteira, 1 linha por dia do mês) e "Por empresa" (mesma janela, já somada por unidade) — cada
+// uma com uma linha de título tipo "A cobrar × pago por dia — janela 01/08/2026 a 31/08/2026
+// (31 dias) · ... · gerado em 03/08/2026" que carrega o mês e a data de geração do relatório.
+//
+// Não vem nenhuma coluna pronta de "Tendência" ou "Real D-1" — só o histórico diário de quanto
+// foi PAGO (assinatura + nova venda + avulso). Por isso calculamos aqui, com a MESMA lógica de
+// ritmo usada no resto do dashboard (ex.: tendVendas=vDU*dusMes, na aba Vendas):
+//   Real D-1 (por unidade) = Pago assinatura + Nova venda + Pago avulso, somados até a data de
+//     geração do relatório menos 1 dia (dias futuros da janela já vêm com pago=0, então a soma
+//     "da janela inteira" da aba "Por empresa" já equivale ao acumulado real até esse dia).
+//   Tendência = ver fórmula final na CORREÇÃO 2 abaixo (o racional mudou 2x em 04/08/2026 — a
+//     história das duas correções fica registrada aqui pra não se perder o racional).
+// CORREÇÃO 1 (04/08/2026, por instrução da Andressa — planilha antiga "data_63.xlsx" comparada com a
+// nova base): até aqui o divisor/multiplicador do ritmo de vendas novas era DUs (dia útil — sáb=0,5,
+// dom=0), enquanto o numerador (vendasRd1, vindo da aba "Por empresa") é a soma de TODOS OS DIAS
+// CORRIDOS já decorridos da janela (inclui sábado e domingo cheios, sem desconto). Misturar as duas
+// bases (numerador em dias corridos ÷ denominador em dias úteis) inflava violentamente o ritmo
+// projetado sempre que a janela decorrida incluía fim de semana — pior ainda quando o mês COMEÇA
+// perto de um fim de semana: agosto/2026 começa no sábado, então em 03/08 só 1,5 DU tinha decorrido
+// (dom conta 0) para 3 dias corridos de caixa real, um multiplicador de ritmo de 23,5/1,5=15,67x em
+// vez do 31/3=10,33x correto em dias corridos — quase 52% de excesso na parcela de vendas novas.
+// A parcela recorrente ("A cobrar") não é afetada (não entra em nenhum ritmo, é o mês inteiro
+// contratado) nem a Inadimplência (usa fracaoJaVencido, uma proporção calendário-a-calendário — ver
+// abaixo). Reconstituímos o racional da planilha antiga a partir de data_63.xlsx (73 linhas, sem
+// coluna de Tendência pronta — só permite reverter Tendência=Base×Ticket+RealVendas×Ticket×k): k
+// (o "multiplicador de ritmo" implícito) ficou concentrado entre 8,08 e 8,53 (mediana ≈8,36) na
+// grande maioria das linhas — consistente com uma extrapolação por RITMO DE DIAS CORRIDOS (não por
+// DU), o que confirma que a base correta pro divisor/multiplicador é dias corridos, não dias úteis.
+// (Duas inconsistências na planilha antiga, sinalizadas à Andressa antes desta correção: FT
+// BELVEDERE saiu com k=-3,11, fora do padrão — parece erro de base/meta naquela linha; e o arquivo
+// não tem nenhuma data de referência gravada, então não dá pra confirmar com 100% de certeza a qual
+// dia do mês aquele extrato correspondia — a comparação de totais de rede é, por isso, aproximada,
+// não uma reconciliação exata linha a linha.)
+// CORREÇÃO 2 (04/08/2026, mesma conversa — a Andressa trouxe "Dados que alimentam o BI.xlsx", a
+// planilha que MONTA a Tendência oficial): essa planilha tem fórmulas de verdade (não só valores),
+// e batemos elas contra o fechamento real de julho/2026 — 65 de 65 unidades com diferença de
+// R$ 0,00. Fórmula oficial confirmada:
+//   Fat. Total = Recorrente + Avulso + Tend.Vendas
+//   Recorrente = Clientes Ativos × Ticket Médio − (Vendas Novas já realizadas × Ticket Médio)
+//     [subtrai as vendas novas do mês pra não contar 2x — elas voltam via Tend.Vendas]
+//   Tend.Vendas = ritmo aplicado à CONTAGEM de vendas novas (dias úteis: sáb=0,5, dom=0) × Ticket
+//   Avulso = valor realizado até agora — NÃO entra em nenhum ritmo/projeção
+// Isso é estruturalmente diferente da CORREÇÃO 1 acima: lá o Recorrente vinha de "A cobrar"
+// (cobrança contratada do mês inteiro) e vendas+avulso eram ritmados juntos em R$. Réplica 100%
+// exata da fórmula oficial não dá: ela depende de 2 fontes externas que não temos ("Play Fast" e
+// "TD"), e nossa única fonte viva de vendas novas (aba "Por empresa" da Assinaturas) só traz R$
+// (data de PAGAMENTO, pode cair em fim de semana), não a CONTAGEM de contratos assinados (quase
+// sempre em dia útil) que a fórmula oficial usa — são dados de natureza diferente (liquidação de
+// pagamento × assinatura do contrato), então não dá pra só converter R$÷Ticket e tratar como se
+// fosse a mesma coisa. Por instrução da Andressa (04/08/2026, "aproximar ao máximo com os dados
+// disponíveis"): realinhamos a ESTRUTURA (Recorrente = Base×Ticket líquido de vendas novas, Avulso
+// sem ritmo nenhum) usando D.ativos_rec/D.tk_auto (Ticket Médio automático já validado contra o BI
+// oficial, r=0,996 — ver comentário onde tk_auto é calculado), mas o ritmo de Vendas Novas continua
+// em R$ (não em contagem) e em DIAS CORRIDOS (não dias úteis), já que é a base coerente com a
+// natureza real do dado que temos. Isso NÃO é bit-a-bit idêntico ao BI oficial — é a aproximação
+// estrutural mais fiel possível com as fontes de dados que temos hoje (Assinaturas + Construção de
+// Metas/base de clientes ativos). A correção manual pontual vista na planilha oficial (1 unidade
+// com ajuste de −22 clientes/−R$20,48 no ticket, específico daquele fechamento) foi um patch de
+// dado, não uma regra permanente — não replicamos isso aqui. Se a unidade não tiver Ticket Médio
+// Automático/Base de Clientes Ativos carregados, cai num fallback pro método da CORREÇÃO 1 só
+// pra essa unidade (ver "usaMetodoOficial" abaixo).
+// "Fat. Meta"/Ticket/Base Clientes/Meta e Real de Vendas NÃO vêm neste arquivo — ficam como já
+// estavam (normalmente vindos da Construção de Metas), só tend/rd1/gap/inad são atualizados aqui.
+// Inadimplência (por instrução da Andressa, 03/08/2026): "A cobrar" (Por empresa) é o RRC do MÊS
+// INTEIRO já contratado — comparar direto com "Pago assinatura" inflaria a inadimplência com
+// cobrança que ainda nem venceu. Por isso só contamos a fatia do "A cobrar" que já venceu até o
+// dia de referência (achada pela distribuição diária da aba "Por dia", rede inteira) — ver cálculo
+// de "fracaoJaVencido" logo abaixo.
+function detectarSheetsAssinaturas(wb){
+  return wb.SheetNames.includes('Por dia')&&wb.SheetNames.includes('Por empresa');
+}
+function acharLinhaTitulo(ws,padrao){
+  for(let r=0;r<Math.min(ws['!ref']?XLSX.utils.decode_range(ws['!ref']).e.r+1:10,10);r++){
+    const cell=ws[XLSX.utils.encode_cell({r,c:0})];
+    const v=cell&&cell.v!=null?String(cell.v):'';
+    if(padrao.test(v))return v;
+  }
+  return '';
+}
+// Acha o índice (0-based) da linha de cabeçalho de verdade — as abas "Por dia"/"Por empresa"
+// têm 2-4 linhas de título/nota/branco ANTES do cabeçalho real (ver exemplos no comentário
+// acima), então não dá pra assumir que a linha 0 é o cabeçalho (como o padrão do sheet_to_json
+// assume) — sem isso, todas as colunas saem undefined e nenhuma unidade é reconhecida.
+function acharLinhaHeader(ws,colunaEsperada){
+  const max=ws['!ref']?XLSX.utils.decode_range(ws['!ref']).e.r+1:10;
+  for(let r=0;r<Math.min(max,10);r++){
+    const cell=ws[XLSX.utils.encode_cell({r,c:0})];
+    const v=cell&&cell.v!=null?String(cell.v).trim().toLowerCase():'';
+    if(v===colunaEsperada)return r;
+  }
+  return 0;
+}
+function mapUnitAssinaturas(raw){
+  let r=String(raw||'').trim();
+  if(!r)return null;
+  if(/^total(\s+rede)?$/i.test(r))return null; // linha de total, não é unidade
+  if(D.unidades_info[r])return r;
+  if(UPLOAD_UNIT_MAP[r])return UPLOAD_UNIT_MAP[r];
+  const rLower=r.toLowerCase();
+  for(const k in UPLOAD_UNIT_MAP){if(k.toLowerCase()===rLower)return UPLOAD_UNIT_MAP[k];}
+  let un=mapUnitFT(r);
+  if(un)return un;
+  // O banco de pagamentos às vezes grava o nome sem o "Tennis" (ex.: "Fast São Caetano",
+  // "Fast Pampulha") — tenta de novo inserindo "Tennis" depois de "Fast " pra bater com o
+  // formato "Fast Tennis X" que mapUnitFT/UPLOAD_UNIT_MAP já reconhecem.
+  if(/^Fast\s+(?!Tennis\b)/i.test(r)){
+    const comTennis=r.replace(/^Fast\s+/i,'Fast Tennis ');
+    if(UPLOAD_UNIT_MAP[comTennis])return UPLOAD_UNIT_MAP[comTennis];
+    for(const k in UPLOAD_UNIT_MAP){if(k.toLowerCase()===comTennis.toLowerCase())return UPLOAD_UNIT_MAP[k];}
+    un=mapUnitFT(comTennis);
+    if(un)return un;
+  }
+  return null;
+}
+function processarArquivoAssinaturas(wb,fname){
+  if(!detectarSheetsAssinaturas(wb))return false; // não é esse formato — deixa o chamador seguir o fluxo normal
+  const hdr=document.getElementById('hdr-date');
+  const wsDia=wb.Sheets['Por dia'], wsEmp=wb.Sheets['Por empresa'];
+
+  const tituloDia=acharLinhaTitulo(wsDia,/janela/i);
+  const mJanela=tituloDia.match(/janela\s+(\d{2})\/(\d{2})\/(\d{4})\s+a\s+(\d{2})\/(\d{2})\/(\d{4})/i);
+  const mGerado=tituloDia.match(/gerado em\s+(\d{2})\/(\d{2})\/(\d{4})/i);
+  if(!mJanela){
+    if(hdr)hdr.innerHTML='❌ Não reconheci a janela de datas na aba "Por dia" (esperava algo como "janela 01/08/2026 a 31/08/2026").';
+    alert('❌ Este arquivo tem o formato de Assinaturas ("Por dia"/"Por empresa"), mas não encontrei a linha de título com a janela de datas na aba "Por dia". Confira se o cabeçalho não mudou.');
+    return true;
+  }
+  const anoMes=mJanela[3]+'-'+mJanela[2]; // ano-mês do INÍCIO da janela (assume janela dentro de 1 mês só)
+  const [anoN,mesN]=anoMes.split('-').map(Number);
+  const ultimoDiaMes=new Date(anoN,mesN,0).getDate();
+  // Dia de referência (equivalente ao "Real D-1"/fat_ref do resto do dashboard): geração do
+  // relatório menos 1 dia (o dia da geração ainda não tem cobrança do dia fechada). Sem uma data
+  // de geração explícita, cai pro último dia da janela (mês já fechado/arquivo antigo).
+  let diaRef=ultimoDiaMes;
+  if(mGerado){
+    const gerY=+mGerado[3], gerM=+mGerado[2], gerD=+mGerado[1];
+    if(gerY===anoN&&gerM===mesN)diaRef=Math.max(Math.min(gerD-1,ultimoDiaMes),1);
+  }
+
+  // Unidades citadas na nota "Fora dos números — unidades sem par no banco de pagamentos: ..."
+  // não são erro de mapeamento — são unidades que sabidamente ainda não estão no banco de
+  // pagamentos, então são esperadas ausentes na aba "Por empresa".
+  const tituloForaDosNumeros=acharLinhaTitulo(wsDia,/fora dos números/i);
+  const mFora=tituloForaDosNumeros.match(/sem par no banco de pagamentos:\s*(.+)/i);
+  const foraDosNumeros=mFora?mFora[1].split(',').map(s=>s.trim()).filter(Boolean):[];
+
+  const headerRowEmp=acharLinhaHeader(wsEmp,'unidade');
+  const rowsEmp=XLSX.utils.sheet_to_json(wsEmp,{range:headerRowEmp,raw:true,defval:null});
+  const keysEmp=rowsEmp.length?Object.keys(rowsEmp[0]):[];
+  const fc=(...pads)=>keysEmp.find(k=>{const kl=k.toLowerCase();return pads.some(p=>kl.indexOf(p)>=0);});
+  const cUn=fc('unidade'), cAssin=fc('pago assinatura'), cNovaV=fc('nova venda'), cNovaVQtd=fc('novas vendas (qtd)','vendas (qtd)'), cAvulso=fc('pago avulso'), cAcobrar=fc('a cobrar');
+  if(!cUn||!cAssin){
+    if(hdr)hdr.innerHTML='❌ Colunas não encontradas na aba "Por empresa" (esperava "Unidade" / "Pago assinatura (R$)").';
+    alert('❌ Não encontrei as colunas esperadas na aba "Por empresa" (Unidade, Pago assinatura (R$)). Confira se o cabeçalho não mudou.');
+    return true;
+  }
+
+  const dusMes=calcDUsMes(anoN,mesN-1);
+  const dusDecorridos=calcDUs(new Date(anoN,mesN-1,1),new Date(anoN,mesN-1,diaRef));
+
+  // Inadimplência: "A cobrar" (Por empresa) é o RRC do MÊS INTEIRO (já contratado, não é
+  // projeção por ritmo — ver comentário da Tendência acima), então "A cobrar − Pago assinatura"
+  // direto ficaria enorme só porque a maior parte do mês ainda nem venceu (nota da própria
+  // planilha: em dias futuros "Pago" é sempre zero porque o vencimento ainda não chegou — não é
+  // inadimplência, é só cobrança futura). Por instrução da Andressa (03/08/2026): considerar só
+  // os dias JÁ VENCIDOS dentro do mês. A aba "Por dia" (rede inteira, não por unidade) dá a
+  // distribuição de "A cobrar" dia a dia — usamos ela pra achar que fração do mês inteiro já
+  // venceu até o dia de referência, e aplicamos essa fração no "A cobrar" de CADA unidade (Por
+  // empresa) pra estimar quanto daquela unidade já tinha vencido. É uma aproximação (assume que a
+  // distribuição de datas de vencimento por dia é parecida entre unidades — não temos o "Por dia"
+  // quebrado por unidade pra fazer isso exato), mas já é muito mais realista que comparar com o
+  // mês inteiro.
+  let fracaoJaVencido=1; // se não der pra calcular (aba "Por dia" sem linhas reconhecíveis), assume mês inteiro já vencido (comportamento antigo) em vez de zerar tudo
+  {
+    const headerRowDia=acharLinhaHeader(wsDia,'data');
+    const rowsDia=XLSX.utils.sheet_to_json(wsDia,{range:headerRowDia,raw:true,defval:null});
+    const keysDia=rowsDia.length?Object.keys(rowsDia[0]):[];
+    const fcDia=(...pads)=>keysDia.find(k=>{const kl=k.toLowerCase();return pads.some(p=>kl.indexOf(p)>=0);});
+    const cData=fcDia('data'), cAcobrarDia=fcDia('a cobrar');
+    if(cData&&cAcobrarDia){
+      let acobrarTotalMes=0, acobrarJaVencido=0;
+      rowsDia.forEach(rd=>{
+        const dataStr=String(rd[cData]||'').trim();
+        const m=dataStr.match(/^(\d{2})\/(\d{2})\/(\d{4})$/); // pula a linha "Total" (não bate o formato de data)
+        if(!m)return;
+        const dia=+m[1];
+        const val=parseNumBR(rd[cAcobrarDia]);
+        acobrarTotalMes+=val;
+        if(dia<=diaRef)acobrarJaVencido+=val;
+      });
+      if(acobrarTotalMes>0)fracaoJaVencido=acobrarJaVencido/acobrarTotalMes;
+    }
+  }
+
+  const naoMapeadas=[];
+  let nUn=0, nUnOficial=0, nUnFallback=0, totRd1=0, totTend=0, totAcobrar=0, totVendasRd1=0, totInad=0;
+  if(!D.fat_data)D.fat_data={};
+  if(!D.fat_data[anoMes])D.fat_data[anoMes]={};
+  // 1ª passada: AGREGA por unidade canônica antes de calcular qualquer coisa. Achado ao investigar
+  // esse arquivo (04/08/2026): algumas unidades têm mais de uma linha na aba "Por empresa" que
+  // mapeiam pro MESMO nome canônico (ex.: "Fast Tennis Radial Leste", "Fast Tennis Radial Leste -
+  // Novo" e "Fast Tennis Paraiso" — histórico de renomeação da mesma unidade, já mapeado de
+  // propósito em UPLOAD_UNIT_MAP). Processar cada linha isoladamente e SOBRESCREVER o registro da
+  // unidade (como o código fazia antes) descarta os valores das linhas anteriores — só a última
+  // processada sobrevivia, perdendo receita real de verdade nas outras linhas do mesmo nome. Agora
+  // somamos as linhas de "Por empresa" que caem na mesma unidade ANTES de aplicar qualquer fórmula.
+  const agregadoPorUnidade={};
+  const unidadesFundidas={};
+  rowsEmp.forEach(r=>{
+    const raw=String(r[cUn]||'').trim();
+    if(!raw)return;
+    const un=mapUnitAssinaturas(raw);
+    if(!un){
+      if(!foraDosNumeros.some(f=>f.toLowerCase()===raw.toLowerCase()))naoMapeadas.push(raw);
+      return;
+    }
+    const ag=agregadoPorUnidade[un]||(agregadoPorUnidade[un]={pagoAssin:0,novaVenda:0,novaVendaQtd:0,temQtd:false,pagoAvulso:0,acobrar:0,rawNomes:[]});
+    ag.pagoAssin+=parseNumBR(cAssin?r[cAssin]:0);
+    ag.novaVenda+=parseNumBR(cNovaV?r[cNovaV]:0);
+    if(cNovaVQtd){const q=parseNumBR(r[cNovaVQtd]);if(!isNaN(q)){ag.novaVendaQtd+=q;ag.temQtd=true;}}
+    ag.pagoAvulso+=parseNumBR(cAvulso?r[cAvulso]:0);
+    ag.acobrar+=parseNumBR(cAcobrar?r[cAcobrar]:0);
+    ag.rawNomes.push(raw);
+  });
+  for(const un in agregadoPorUnidade){
+    if(agregadoPorUnidade[un].rawNomes.length>1)unidadesFundidas[un]=agregadoPorUnidade[un].rawNomes;
+  }
+  // 2ª passada: calcula rd1/tend/inad em cima do agregado (uma vez por unidade canônica).
+  for(const un in agregadoPorUnidade){
+    const ag=agregadoPorUnidade[un];
+    const pagoAssin=ag.pagoAssin;
+    const novaVenda=ag.novaVenda;
+    const pagoAvulso=ag.pagoAvulso;
+    const acobrar=ag.acobrar;
+    // Real D-1 = tudo que já entrou de fato até o dia de referência (recorrente + vendas novas
+    // + avulso) — não é uma projeção, é o caixa realizado. Não muda com a correção abaixo.
+    const rd1=Math.round(pagoAssin+novaVenda+pagoAvulso);
+    // Tendência — CORREÇÃO (04/08/2026, 2ª etapa): a Andressa trouxe "Dados que alimentam o
+    // BI.xlsx" (a planilha que monta a Tendência oficial) e confirmamos a fórmula EXATA batendo
+    // contra o fechamento real de julho/2026 (65 de 65 unidades, diferença de R$ 0,00):
+    //   Fat. Total = Recorrente + Avulso + Tend.Vendas
+    //   Recorrente = Clientes Ativos × Ticket Médio − (Vendas Novas já realizadas × Ticket Médio)
+    //     [subtrai as vendas novas do mês pra não contar 2x, já que elas voltam via Tend.Vendas]
+    //   Tend.Vendas = ritmo aplicado à CONTAGEM de vendas novas (dias úteis) × Ticket Médio
+    //   Avulso = valor realizado, NÃO entra em nenhum ritmo/projeção
+    // Isso é estruturalmente diferente do que a gente tinha aqui: usávamos "A cobrar" (cobrança
+    // contratada do mês inteiro) como Recorrente, e ritmava nova venda+avulso juntos em R$.
+    // Réplica EXATA não dá: a fórmula oficial depende de 2 fontes externas que não temos ("Play
+    // Fast" e "TD"), e a nossa única fonte viva de vendas novas (Assinaturas) só traz R$ (data de
+    // PAGAMENTO, pode cair em fim de semana), não a CONTAGEM de contratos assinados (dia útil,
+    // quase sempre) que a fórmula oficial usa. Por instrução da Andressa (04/08/2026, "aproximar
+    // ao máximo com os dados disponíveis"): realinhamos a ESTRUTURA (Recorrente = Base×Ticket
+    // líquido de vendas novas, Avulso sem ritmo) usando D.ativos_rec/D.tk_auto (já validados
+    // contra o BI, r=0,996 — ver comentário na função que calcula tk_auto), mas o ritmo de vendas
+    // novas continua em R$ (não em contagem) e em DIAS CORRIDOS (não dias úteis), porque é a base
+    // que corresponde à natureza real do dado que temos (pagamento pode cair em qualquer dia).
+    // A correção manual pontual que vimos na planilha oficial (ex.: 1 unidade com ajuste de -22
+    // clientes/-R$20,48 no ticket) foi um patch de dado daquele mês específico, não uma regra
+    // permanente — não replicamos isso aqui.
+    // Fallback: se a unidade não tem Clientes Ativos/Ticket Médio Automático carregados (base de
+    // clientes desatualizada ou nunca subida), voltamos pro método anterior ("A cobrar" + ritmo
+    // em R$ de nova venda+avulso) só pra essa unidade, e avisamos no alerta quantas caíram nesse
+    // fallback — evita zerar/quebrar a Tendência de unidades sem essa base carregada ainda.
+    const tkAuto=(D.tk_auto&&D.tk_auto[un]&&D.tk_auto[un].tk>0)?D.tk_auto[un].tk:0;
+    const ativosRecUn=(D.ativos_rec&&D.ativos_rec[un]>0)?D.ativos_rec[un]:0;
+    const usaMetodoOficial=tkAuto>0&&ativosRecUn>0;
+    // Achado extra ao mapear a aba "Por empresa": ela já traz uma coluna "Novas vendas (qtd)"
+    // (contagem, não R$) que o dashboard nunca lia — dá pra ritmar a CONTAGEM (igual ao mecanismo
+    // oficial: ritmo na contagem, só multiplica pelo ticket no final) em vez do R$ direto, o que
+    // aproxima ainda mais do racional oficial. Isso NÃO resolve a base dias-úteis-vs-dias-corridos
+    // (essa contagem também é por data de PAGAMENTO da 1ª fatura, então também cai em fim de
+    // semana — ver nota da própria planilha na aba "Por dia" — continuamos ritmando em DIAS
+    // CORRIDOS), mas deixa o mecanismo (contagem × ticket, com arredondamento pro cliente inteiro)
+    // igual ao oficial em vez de ritmar o R$ cru.
+    const novaVendaQtd=ag.temQtd?ag.novaVendaQtd:null;
+    let fatRecorrente, fatAvulsoFinal, vendasTend;
+    if(usaMetodoOficial){
+      fatRecorrente=Math.max(0,ativosRecUn*tkAuto-novaVenda);
+      fatAvulsoFinal=pagoAvulso; // não entra em ritmo, igual à planilha oficial
+      if(novaVendaQtd!=null&&!isNaN(novaVendaQtd)){
+        const tendVendasQtd=diaRef>0?Math.round(novaVendaQtd/diaRef*ultimoDiaMes):novaVendaQtd;
+        vendasTend=tendVendasQtd*tkAuto;
+      }else{
+        vendasTend=diaRef>0?(novaVenda/diaRef*ultimoDiaMes):novaVenda; // fallback: coluna qtd não veio no arquivo
+      }
+    }else{
+      fatRecorrente=acobrar;
+      fatAvulsoFinal=0; // já embutido no ritmo abaixo, como no método antigo (fallback)
+      vendasTend=diaRef>0?((novaVenda+pagoAvulso)/diaRef*ultimoDiaMes):(novaVenda+pagoAvulso);
+    }
+    const tend=Math.round(fatRecorrente+fatAvulsoFinal+vendasTend);
+    // Inadimplência = fatia do "A cobrar" desta unidade que já venceu (acobrar × fracaoJaVencido,
+    // ver cálculo acima) menos o que ela já pagou de assinatura — nunca negativo (se pagou mais
+    // do que já venceu, não sobra inadimplência, só adiantamento). Não muda com a correção acima
+    // (usa "A cobrar" diretamente, igual antes — não depende do método de Recorrente da Tendência).
+    const inad=Math.max(0,Math.round(acobrar*fracaoJaVencido-pagoAssin));
+    if(!D.fat_data[anoMes][un])D.fat_data[anoMes][un]={fm:0,tend:0,rd1:0,gap:0,inad:0,tk:0,bc:0,mv:0,rv:0};
+    const rec=D.fat_data[anoMes][un];
+    rec.rd1=rd1;
+    rec.tend=tend;
+    rec.gap=tend-rec.fm;
+    rec.inad=inad;
+    totRd1+=rd1; totTend+=tend; totAcobrar+=acobrar; totVendasRd1+=(novaVenda+pagoAvulso); totInad+=inad; nUn++;
+    if(usaMetodoOficial)nUnOficial++; else nUnFallback++;
+  }
+  if(!nUn){
+    if(hdr)hdr.innerHTML='❌ Nenhuma unidade reconhecida na aba "Por empresa"';
+    alert('❌ Não reconheci nenhuma unidade na aba "Por empresa" deste arquivo de Assinaturas.');
+    return true;
+  }
+
+  if(!D.fat_ref)D.fat_ref={};
+  D.fat_ref[anoMes]=anoMes+'-'+String(diaRef).padStart(2,'0');
+
+  try{
+    const saved=JSON.parse(localStorage.getItem('ft_fat_oficial')||'{}');
+    saved.fat_data=saved.fat_data||{};
+    saved.fat_data[anoMes]=D.fat_data[anoMes];
+    saved.fat_ref=saved.fat_ref||{};
+    saved.fat_ref[anoMes]=D.fat_ref[anoMes];
+    saved.savedAt=new Date().toISOString();
+    localStorage.setItem('ft_fat_oficial',JSON.stringify(saved));
+  }catch(e){console.warn('save assinaturas:',e);}
+
+  const [ay,am]=anoMes.split('-');
+  let msg='✅ Assinaturas (A cobrar × Pago) carregadas — '+am+'/'+ay+' até dia '+String(diaRef).padStart(2,'0')+':\n\n'
+    +nUn+' unidades · Real D-1 R$ '+totRd1.toLocaleString('pt-BR')+' · Tendência R$ '+totTend.toLocaleString('pt-BR')
+    +'\n\n⚠️ Tendência = Recorrente (Clientes Ativos × Ticket Médio, líquido das vendas novas já realizadas) + Avulso (realizado, sem ritmo) + Vendas novas projetadas por ritmo em DIAS CORRIDOS (racional alinhado com "Dados que alimentam o BI.xlsx", validado contra o fechamento real de julho/26). '
+    +(nUnOficial)+' unidade(s) usaram esse método; '+(nUnFallback>0?nUnFallback+' unidade(s) sem Ticket Médio/Base de Clientes atualizados caíram no método anterior (A cobrar + ritmo sobre nova venda/avulso em R$) só como fallback — suba a base de clientes ativos pra essas unidades entrarem no método novo.':'nenhuma unidade precisou do fallback.')
+    +' A Meta (Fat. Meta) não muda, continua vindo da Construção de Metas.';
+  // Só a parte de vendas novas é projetada por ritmo (o recorrente entra líquido, sem projeção,
+  // e o avulso entra direto, também sem projeção) — ainda vale avisar quando faltam poucos dias
+  // corridos decorridos, já que a fatia de vendas novas ainda pode oscilar bastante.
+  if(diaRef<3){
+    msg+='\n\n🚨 ATENÇÃO: só '+diaRef+' dia(s) corrido(s) passou(aram) no mês — a parte de VENDAS NOVAS da Tendência ainda é instável nesse início de mês (o recorrente já é estável). Trate a Tendência com cautela até termos mais dias de dado.';
+  }
+  msg+='\n\n💰 Inadimplência (rede): R$ '+Math.round(totInad).toLocaleString('pt-BR')+' — calculada só sobre a fatia do "A cobrar" que já venceu até o dia '+String(diaRef).padStart(2,'0')+' (~'+(fracaoJaVencido*100).toFixed(1)+'% do mês), não o mês inteiro. É uma aproximação por unidade (a aba "Por dia" só vem por rede, não por unidade — assume distribuição de vencimentos parecida entre unidades).';
+  if(naoMapeadas.length){
+    msg+='\n\n⚠️ Unidades não reconhecidas (cadastre pelo botão ➕ Nova Unidade e suba de novo): '+naoMapeadas.join(', ');
+  }
+  if(Object.keys(unidadesFundidas).length){
+    // Achado 04/08/2026: linhas da aba "Por empresa" que mapeiam pro mesmo nome canônico (histórico
+    // de renomeação de unidade) agora são SOMADAS antes de calcular Tendência/Real D-1 — antes a
+    // última linha processada sobrescrevia as outras, perdendo receita real dessas unidades.
+    const txt=Object.keys(unidadesFundidas).map(u=>dispName(u)+' (linhas: '+unidadesFundidas[u].join(' + ')+')').join('; ');
+    msg+='\n\nℹ️ Linhas somadas (mesma unidade, nomes diferentes no banco de pagamentos): '+txt;
+  }
+  alert(msg);
+  if(hdr)hdr.innerHTML='💳 Assinaturas '+am+'/'+ay+' carregadas<br><strong>'+nUn+' unidades · até dia '+String(diaRef).padStart(2,'0')+'</strong>';
+  try{renderActive();}catch(e){}
+  return true;
+}
+
 function processarArquivoFat(input){
   const file=input.files[0]; if(!file)return;
   try{fecharModal();}catch(e){}
@@ -5934,6 +7675,9 @@ function processarArquivoFat(input){
   reader.onload=function(e){
     try{
       const wb=XLSX.read(e.target.result,{type:'array',cellDates:true});
+      if(processarArquivoConstrucaoMetas(wb,fname))return; // formato novo (Construção de Metas), já tratado
+      if(processarArquivoAssinaturas(wb,fname))return; // formato "A cobrar × Pago" (assinaturas), já tratado
+      if(processarArquivoContatosFranqueados(wb,fname))return; // planilha de Dados cadastrais/contatos, subida no botão errado
       const ws=wb.Sheets[pickBestSheet(wb)];
       const rows=XLSX.utils.sheet_to_json(ws,{raw:false});
       processarLinhasFat(rows,fname);
@@ -5976,19 +7720,29 @@ function processarLinhasFat(rows,fname){
       if(/^FT\s/i.test(raw))naoMap.push(raw);
       return;
     }
+    // Se a Construção de Metas já definiu a meta oficial deste mês/unidade, ela manda —
+    // ignora o valor de "Fat. Meta"/"Meta de Vendas" que vier dentro deste arquivo de
+    // Faturamento Rede (esse arquivo é a fonte do Real/Tendência, não mais da Meta).
+    // Sem isso, subir o Faturamento Rede depois da Construção de Metas voltava a trocar a
+    // meta pelo valor (normalmente desatualizado) que vem dentro do próprio arquivo de Real.
+    const fmOficial=D.fat_meta_oficial&&D.fat_meta_oficial[mk]&&D.fat_meta_oficial[mk][un];
+    const mvOficial=D.metas_vendas_oficial&&D.metas_vendas_oficial[mk]&&D.metas_vendas_oficial[mk][un];
+    const fmVal=fmOficial!=null?fmOficial:Math.round(parseNumBR(r[cFm]));
+    const tendVal=Math.round(parseNumBR(cTend?r[cTend]:0));
+    const mvVal=mvOficial!=null?mvOficial:Math.round(parseNumBR(cMv?r[cMv]:0));
     fd[un]={
-      fm:  Math.round(parseNumBR(r[cFm])),
-      tend:Math.round(parseNumBR(cTend?r[cTend]:0)),
+      fm:  fmVal,
+      tend:tendVal,
       rd1: Math.round(parseNumBR(cRd1?r[cRd1]:0)),
-      gap: Math.round(parseNumBR(cTend?r[cTend]:0))-Math.round(parseNumBR(r[cFm])),
+      gap: tendVal-fmVal,
       inad:Math.round(parseNumBR(cInad?r[cInad]:0)),
       tk:  Math.round(parseNumBR(cTk?r[cTk]:0)),
       bc:  Math.round(parseNumBR(cBc?r[cBc]:0)),
-      mv:  Math.round(parseNumBR(cMv?r[cMv]:0)),
+      mv:  mvVal,
       rv:  Math.round(parseNumBR(cRv?r[cRv]:0)),
     };
-    if(cMv&&parseNumBR(r[cMv])>0)metas[un]=Math.round(parseNumBR(r[cMv]));
-    if(parseNumBR(r[cFm])>0)fmeta[un]=Math.round(parseNumBR(r[cFm]));
+    if(mvVal>0)metas[un]=mvVal;
+    if(fmVal>0)fmeta[un]=fmVal;
     if(cGer&&String(r[cGer]||'').trim()){
       let gv=String(r[cGer]).trim();
       // Normaliza variações de "Operação Própria" para o código interno "O.P" — evita duplicar
@@ -6061,6 +7815,24 @@ function lerArquivoComoLinhas(file){
         let rows;
         try{
           const wb=XLSX.read(e.target.result,{type:'array',cellDates:true});
+          // Roteamento por workbook (antes de achatar pra "rows" de uma unica aba): as planilhas
+          // de Construcao de Metas e de Assinaturas ("A cobrar x Pago") sao multi-aba e so dao pra
+          // reconhecer olhando os nomes das abas do wb inteiro -- se essa planilha do BI for subida
+          // no botao errado (Carregar Base em vez de Metas do Mes), sem isso ela cai direto no
+          // fluxo de base de clientes/vendas (que olha so uma aba ja achatada em linhas) e NUNCA
+          // chega no calculo de Tendencia/Meta, silenciosamente.
+          if(detectarSheetsConstrucaoMetas(wb).length){
+            resolve({ok:true,rows:null,fname:file.name,isConstrucaoMetas:true,wb});
+            return;
+          }
+          if(detectarSheetsAssinaturas(wb)){
+            resolve({ok:true,rows:null,fname:file.name,isAssinaturas:true,wb});
+            return;
+          }
+          if(detectarPlanilhaContatosFranqueados(wb)){
+            resolve({ok:true,rows:null,fname:file.name,isContatosFranqueados:true,wb});
+            return;
+          }
           // Detectar planilha de Acompanhamento da Rede: uma ou mais abas nomeadas por mês,
           // cada uma com uma linha de cabeçalho "Unidades" no início da folha.
           const normMes=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
@@ -6215,7 +7987,20 @@ async function processarArquivoVendas(input){
       continue;
     }
     try{
-      if(res.isConversao){
+      if(res.isConstrucaoMetas||res.isAssinaturas){
+        // Planilha do BI (Construcao de Metas ou Assinaturas) subida pelo botao "Carregar Base"
+        // em vez de "Metas do Mes" -- processa pelo fluxo correto em vez de tentar achatar em
+        // linhas de base de clientes (onde nunca seria reconhecida).
+        const handled=res.isConstrucaoMetas?processarArquivoConstrucaoMetas(res.wb,res.fname):processarArquivoAssinaturas(res.wb,res.fname);
+        if(!handled){
+          alert('Nao consegui reconhecer o formato deste arquivo ('+res.fname+'). Confira se e mesmo uma planilha de Construcao de Metas ou de Assinaturas (A cobrar x Pago).');
+        }
+      } else if(res.isContatosFranqueados){
+        // Planilha de Dados cadastrais/contatos subida pelo botão "Carregar Base" em vez do
+        // botão dedicado — processa pelo fluxo correto de contatos de franqueados.
+        processarArquivoContatosFranqueados(res.wb,res.fname);
+      } else if(res.isConversao){
+
         const r=processarLinhasConversao(res.porMes,res.fname);
         alert(r.ok?('✅ Conversão: '+r.nMeses+' meses · '+r.nUnidades+' unidades'):('❌ '+r.error));
         const hdrEl2=document.getElementById('hdr-date');
@@ -6548,8 +8333,9 @@ function processarLinhasVendas(rows, fname){
   }
 
   // Ocupação real (Adulto/Infantil) — a partir da agenda semanal de clientes com recorrência
-  // ativa. Regra de negócio (Fast Tennis): unidades operam Segunda a Sexta das 06h às 22h
-  // e Sábado das 06h às 15h; Domingo fechado — NÃO alterar sem confirmar com o cliente.
+  // ativa. Regra de negócio (Fast Tennis, confirmada em 02/08/2026): unidades operam Segunda a
+  // Sexta das 06h às 22h, Sábado das 06h às 15h e Domingo das 06h às 22h (liberado para locação)
+  // — NÃO alterar sem confirmar com o cliente.
   // Em cada slot dia×hora, o nº de clientes agendados é limitado ao nº de quadras (não dá pra
   // ocupar mais quadras do que a unidade tem); a ocupação final é a média de uso de todos os slots.
   if(colsAgenda.length){
@@ -6557,7 +8343,7 @@ function processarLinhasVendas(rows, fname){
     const HORAS_POR_DIA={0:[],1:[],2:[],3:[],4:[],5:[],6:[]};
     for(let d=1;d<=5;d++){for(let h=6;h<22;h++)HORAS_POR_DIA[d].push(h);} // Seg-Sex 06h-22h
     for(let h=6;h<15;h++)HORAS_POR_DIA[6].push(h); // Sábado 06h-15h
-    // Domingo (0) fica vazio — unidade fechada, não soma capacidade nem uso
+    for(let h=6;h<22;h++)HORAS_POR_DIA[0].push(h); // Domingo 06h-22h (liberado para locação)
     const ocupacaoReal={};
     for(const u in agendaOcup){
       const info=D.unidades_info[u]||{};
@@ -7405,6 +9191,10 @@ try{
     if(fo.fat_data)for(const mk in fo.fat_data)D.fat_data[mk]=fo.fat_data[mk];
     if(fo.metas_mensais)for(const mk in fo.metas_mensais)D.metas_mensais[mk]=fo.metas_mensais[mk];
     if(fo.fat_meta){if(!D.fat_meta)D.fat_meta={};for(const mk in fo.fat_meta)D.fat_meta[mk]=fo.fat_meta[mk];}
+    // Metas "oficiais" (vindas da Construção de Metas) — precisam sobreviver ao recarregamento
+    // da página pra continuar protegendo contra uploads futuros de Faturamento Rede.
+    if(fo.fat_meta_oficial){if(!D.fat_meta_oficial)D.fat_meta_oficial={};for(const mk in fo.fat_meta_oficial)D.fat_meta_oficial[mk]=fo.fat_meta_oficial[mk];}
+    if(fo.metas_vendas_oficial){if(!D.metas_vendas_oficial)D.metas_vendas_oficial={};for(const mk in fo.metas_vendas_oficial)D.metas_vendas_oficial[mk]=fo.metas_vendas_oficial[mk];}
     if(fo.gerentes)for(const u in fo.gerentes){if(D.unidades_info[u])D.unidades_info[u].gerente=fo.gerentes[u];}
     if(fo.fat_ref){if(!D.fat_ref)D.fat_ref={};for(const mk in fo.fat_ref)if(fo.fat_ref[mk])D.fat_ref[mk]=fo.fat_ref[mk];}
   }
@@ -7478,9 +9268,113 @@ function aplicarNovasUnidadesRemotas(lista){
   }catch(e){console.warn('aplicar novas unidades remotas:',e);}
 }
 
+// ── Rolagem horizontal de tabelas/faixas de KPI largas com o mouse comum ──────────────────
+// Tabelas largas (Bom Dia Vendas, Raio X, etc.) já rolam de lado dentro do próprio card
+// (overflow-x:auto), mas isso normalmente só é descoberto arrastando a barrinha fina ou usando
+// Shift+scroll/gesto de trackpad — dentro do embed da LearnWorlds (iframe estreito, cortado
+// pelo menu "Trilha" do curso), ninguém pensa em tentar isso, e a tabela parece só "cortada".
+// Esse listener detecta quando o mouse está sobre um trecho com sobra horizontal e transforma
+// o scroll vertical comum (roda do mouse) em scroll horizontal ali — sem precisar descobrir
+// nada. Não afeta a rolagem normal da página em nenhum outro lugar (só age quando o elemento
+// sob o mouse realmente tem conteúdo cortado dos lados).
+(function(){
+  function acharAlvoRolavel(el){
+    while(el&&el!==document.body&&el!==document.documentElement){
+      if(el.scrollWidth>el.clientWidth+1){
+        const cs=getComputedStyle(el);
+        if(cs.overflowX==='auto'||cs.overflowX==='scroll')return el;
+      }
+      el=el.parentElement;
+    }
+    return null;
+  }
+  document.addEventListener('wheel',function(e){
+    if(e.shiftKey)return; // Shift+scroll já é o atalho padrão do navegador — não interfere
+    const alvo=acharAlvoRolavel(e.target);
+    if(!alvo)return;
+    const podeDireita=alvo.scrollLeft+alvo.clientWidth<alvo.scrollWidth-1;
+    const podeEsquerda=alvo.scrollLeft>1;
+    if((e.deltaY>0&&podeDireita)||(e.deltaY<0&&podeEsquerda)){
+      e.preventDefault();
+      alvo.scrollLeft+=e.deltaY;
+    }
+  },{passive:false});
+})();
+
 function iniciarDashboard(){
   // ── Restaurar unidades novas cadastradas pelo botão "➕ Nova Unidade" NESTE navegador
   aplicarNovasUnidadesSalvas();
+  // ── Migração pontual: corrige o nome da unidade "TABAUTE" (typo da fonte de Construção de
+  // Metas) para "TAUBATÉ" caso ela já tenha sido auto-cadastrada com o nome errado NESTE
+  // navegador numa sessão anterior a esta correção existir (ver NOME_EXIBICAO_CORRECOES/
+  // NUCLEO_CORRECOES). Roda só uma vez — depois que a chave certa existir, a condição já não bate.
+  try{
+    const chaveErrada='Fast Tennis TABAUTE - SP', chaveCerta='Fast Tennis TAUBATÉ - SP';
+    if(D.unidades_info[chaveErrada]&&!D.unidades_info[chaveCerta]){
+      renomearUnidadeEmTodosCampos(chaveErrada,chaveCerta);
+      if(D.unidades_info[chaveCerta])D.unidades_info[chaveCerta].unidade=chaveCerta;
+      const novas=JSON.parse(localStorage.getItem('ft_novas_unidades')||'[]');
+      let mudou=false;
+      novas.forEach(n=>{ if(n&&n.chave===chaveErrada){ n.chave=chaveCerta; if(n.info)n.info.unidade=chaveCerta; mudou=true; } });
+      if(mudou)localStorage.setItem('ft_novas_unidades',JSON.stringify(novas));
+    }
+  }catch(e){console.warn('migração Taubaté:',e);}
+  // ── Migração pontual: funde unidades cadastradas em DUPLICIDADE sob um núcleo que a Andressa
+  // pediu pra unificar (04/08/2026 -- "NÃO É PARA DUPLICAR BURITIS I e II ... essa regra já
+  // existia antes"). A correção de match (NUCLEO_CORRECOES) impede NOVOS cadastros duplicados
+  // desde que foi implementada, mas não desfaz cadastros que já tinham acontecido ANTES dela
+  // existir neste navegador -- ex.: cadastro manual via ➕ Nova Unidade feito a partir do aviso
+  // "unidade não reconhecida" de uma subida de Contatos Franqueados, criando "Fast Tennis Buritis
+  // I"/"Fast Tennis Buritis II" como unidades NOVAS e separadas, em vez de reconhecer que já
+  // existia "Fast Tennis BURITIS - BELO HORIZONTE". Isso inflava a contagem de "Unidades em
+  // Operação" (cada duplicata soma peso extra) e diluía a Meta/Tendência entre 3 entradas em vez
+  // de ficar concentrada na única unidade real. Varre TODAS as chaves cadastradas, agrupa pelo
+  // núcleo (mesma função de match usada nos uploads) e funde qualquer chave que não seja a
+  // canônica na canônica -- cobre qualquer variação de nome que tenha sido digitada (não só as 2
+  // que a Andressa citou), sem precisar saber de antemão a grafia exata usada no cadastro manual.
+  try{
+    const CANONICOS_DEDUP={
+      'BURITIS':'Fast Tennis BURITIS - BELO HORIZONTE',
+      'INDAIATUBA':'Fast Tennis INDAIATUBA - SÃO PAULO',
+      'ORLA PAMPULHA':'Fast Tennis ORLA PAMPULHA - BELO HORIZONTE'
+    };
+    let fundiuAlgo=false;
+    Object.keys(CANONICOS_DEDUP).forEach(nucleo=>{
+      const chaveCanonica=CANONICOS_DEDUP[nucleo];
+      if(!D.unidades_info[chaveCanonica])return; // canônica não existe (não deveria acontecer) -- não mexe
+      Object.keys(D.unidades_info).slice().forEach(chave=>{
+        if(chave===chaveCanonica)return;
+        if(nucleoUnidadeCurta(chave)!==nucleo)return;
+        renomearUnidadeEmTodosCampos(chave,chaveCanonica); // já cobre unidades_info (está em CAMPOS_SNAPSHOT_DADOS)
+        if(D.unidades_info[chaveCanonica])D.unidades_info[chaveCanonica].unidade=chaveCanonica;
+        fundiuAlgo=true;
+        console.warn('deduplicação de unidades: "'+chave+'" fundida em "'+chaveCanonica+'"');
+      });
+    });
+    if(fundiuAlgo){
+      _nucleoCanonicoUnidadesCache=null; // pode ter ficado apontando pra uma chave que acabou de ser removida
+      try{
+        const novas=JSON.parse(localStorage.getItem('ft_novas_unidades')||'[]');
+        const filtradas=novas.filter(n=>n&&D.unidades_info[n.chave]); // tira as que foram fundidas/removidas
+        if(filtradas.length!==novas.length)localStorage.setItem('ft_novas_unidades',JSON.stringify(filtradas));
+      }catch(e){console.warn('limpeza ft_novas_unidades pós-deduplicação:',e);}
+    }
+  }catch(e){console.warn('deduplicação de unidades:',e);}
+  // ── Restaurar contatos de franqueados salvos (upload 📇 Contatos Franqueados) -- roda DEPOIS
+  // de aplicarNovasUnidadesSalvas() de propósito: só assim as unidades auto-cadastradas pela
+  // Construção de Metas já existem em D.unidades_info na hora de aplicar Cidade/Quadras.
+  try{
+    const cf=JSON.parse(localStorage.getItem('ft_contatos_upload')||'null');
+    if(cf&&cf.contatos){
+      if(!D.contatos_franqueados)D.contatos_franqueados={};
+      for(const u in cf.contatos)D.contatos_franqueados[u]=cf.contatos[u];
+    }
+    if(cf&&cf.infoUpdates){
+      for(const u in cf.infoUpdates){
+        if(D.unidades_info[u])Object.assign(D.unidades_info[u],cf.infoUpdates[u]);
+      }
+    }
+  }catch(e){console.warn('restore contatos franqueados:',e);}
   initFilters();
   initCampanhas();
   initDia();
@@ -7499,4 +9393,5 @@ Promise.all([
   .catch(()=>{ /* nenhum arquivo de dados remoto disponível — segue só com dados locais */ })
   .finally(iniciarDashboard);
 </script>
+</div><!-- /#embed-scroll -->
 </body></html>
